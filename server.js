@@ -5,6 +5,9 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
+// Guardar mensajes recibidos mientras el servidor está funcionando
+const mensajes = [];
+
 app.get("/webhook", (req, res) => {
   if (req.query["hub.verify_token"] === process.env.VERIFY_TOKEN) {
     return res.send(req.query["hub.challenge"]);
@@ -23,8 +26,16 @@ app.post("/webhook", async (req, res) => {
 
   const from = message.from;
 
-  // Cualquier mensaje de texto muestra el menú
+  // Guardar mensaje recibido
   if (message.type === "text") {
+    mensajes.push({
+      from,
+      texto: message.text.body,
+      fecha: new Date().toISOString()
+    });
+
+    console.log(`Mensaje de ${from}: ${message.text.body}`);
+
     await menu(from);
   }
 
@@ -32,7 +43,6 @@ app.post("/webhook", async (req, res) => {
   if (message.type === "interactive") {
     const id = message.interactive.button_reply?.id;
 
-    // Ver catálogo
     if (id === "catalogo") {
       await texto(
         from,
@@ -40,31 +50,27 @@ app.post("/webhook", async (req, res) => {
       );
     }
 
-    // Pregunta de origen + botones
     if (id === "origen") {
-      await preguntaComercio(from);
+      await texto(
+        from,
+        "📍 Somos de Miramar, Buenos Aires.\n\n🇦🇷 Hacemos envíos a todo el país por Correo Argentino y el pedido suele llegar en 2 a 5 días hábiles.\n\n🏪 ¿Tenés kiosco o comercio?"
+      );
     }
 
-    // Tiene comercio
     if (id === "comercio") {
       await texto(
         from,
         "¡Buenísimo! 🙌✨\n\nTe invito a sumarte a nuestro grupo de WhatsApp ☺️\n\nhttps://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad"
       );
     }
-
-    // No tiene comercio
-    if (id === "particular") {
-      await texto(
-        from,
-        "¡Perfecto! 😊\n\nPodés ver todos nuestros productos en el catálogo:\n\nhttps://golosinasaries.github.io/catalogo\n\n🇦🇷 Hacemos envíos a todo el país."
-      );
-    }
   }
 });
 
+// Página temporal para comprobar los mensajes recibidos
+app.get("/mensajes", (req, res) => {
+  res.json(mensajes);
+});
 
-// MENÚ PRINCIPAL
 async function menu(to) {
   await axios.post(
     `https://graph.facebook.com/v23.0/${process.env.PHONE_NUMBER_ID}/messages`,
@@ -74,12 +80,10 @@ async function menu(to) {
       type: "interactive",
       interactive: {
         type: "button",
-
         body: {
           text:
             "👋 ¡Hola! Bienvenid@ a Golosinas Aries ♈🔥\n\n🇦🇷 Enviamos a todo el país\n📍 Desde Miramar, Buenos Aires\n\n¿Qué querés hacer?"
         },
-
         action: {
           buttons: [
             {
@@ -116,55 +120,6 @@ async function menu(to) {
   );
 }
 
-
-// PREGUNTA CON OPCIONES
-async function preguntaComercio(to) {
-  await axios.post(
-    `https://graph.facebook.com/v23.0/${process.env.PHONE_NUMBER_ID}/messages`,
-    {
-      messaging_product: "whatsapp",
-      to,
-      type: "interactive",
-
-      interactive: {
-        type: "button",
-
-        body: {
-          text:
-            "📍 Somos de Miramar, Buenos Aires.\n\n🇦🇷 Hacemos envíos a todo el país por Correo Argentino y el pedido suele llegar en 2 a 5 días hábiles.\n\n🏪 ¿Tenés kiosco o comercio?"
-        },
-
-        action: {
-          buttons: [
-            {
-              type: "reply",
-              reply: {
-                id: "comercio",
-                title: "🏪 Sí, tengo comercio"
-              }
-            },
-            {
-              type: "reply",
-              reply: {
-                id: "particular",
-                title: "👤 Soy particular"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    }
-  );
-}
-
-
-// MENSAJE DE TEXTO
 async function texto(to, mensaje) {
   await axios.post(
     `https://graph.facebook.com/v23.0/${process.env.PHONE_NUMBER_ID}/messages`,
@@ -184,7 +139,6 @@ async function texto(to, mensaje) {
     }
   );
 }
-
 
 const PORT = process.env.PORT || 3000;
 
