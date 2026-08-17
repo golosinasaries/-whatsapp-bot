@@ -554,6 +554,11 @@ app.post("/webhook", async (req, res) => {
       opciones.add("pago");
       usuariosOpciones.set(from, opciones);
 
+      // Incrementar contador
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
+
+      // DIRECTO AL CATÁLOGO SIN MENSAJE
       await sendWhatsApp({
         messaging_product: "whatsapp",
         to: from,
@@ -561,7 +566,7 @@ app.post("/webhook", async (req, res) => {
         interactive: {
           type: "cta_url",
           body: {
-            text: "🛒 Acá está nuestro catálogo completo ✨"
+            text: "🛒"
           },
           action: {
             name: "cta_url",
@@ -580,10 +585,6 @@ app.post("/webhook", async (req, res) => {
         estado: "bot",
         direccion: "salida"
       });
-
-      // Incrementar contador
-      const contador = (usuariosContadores.get(from) || 0) + 1;
-      usuariosContadores.set(from, contador);
 
       return;
     }
