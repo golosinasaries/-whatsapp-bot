@@ -14,6 +14,7 @@ const GRUPO_WHATSAPP = "https://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad";
 const usuariosConsultandoGrupo = new Set();
 const usuariosIniciados = new Set();
 const usuariosAsesor = new Set();
+const usuariosContadores = new Map(); // Nuevo: contador de preguntas por usuario
 
 function normalizeText(text = "") {
   return String(text)
@@ -177,6 +178,13 @@ async function menu(to) {
     }
   });
 
+  // Aquí ya NO enviamos la opción de "Hablar con asesor" automáticamente
+}
+
+// Nueva función para mostrar asesor después de varias preguntas
+async function menuConAsesor(to) {
+  await menu(to);
+
   await sendWhatsApp({
     messaging_product: "whatsapp",
     to,
@@ -311,6 +319,10 @@ function manejarTextoCliente(from, textoCliente) {
 
   if (usuariosAsesor.has(from)) return;
 
+  // Incrementar contador de preguntas
+  const contador = (usuariosContadores.get(from) || 0) + 1;
+  usuariosContadores.set(from, contador);
+
   if (usuariosConsultandoGrupo.has(from)) {
     if (containsAny(textoCliente, ["si", "sí", "quiero", "sumarme", "unirme", "dale"])) {
       return invitacionGrupo(from);
@@ -324,6 +336,10 @@ function manejarTextoCliente(from, textoCliente) {
 
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
+    // Mostrar asesor si ya respondimos 3+ preguntas
+    if (contador >= 3) {
+      return menuConAsesor(from);
+    }
     return menu(from);
   }
 
