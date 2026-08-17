@@ -1080,8 +1080,11 @@ app.post("/responder", async (req, res) => {
     res.json({ ok: true });
     console.log(`✅ Respuesta enviada a ${to}`);
   } catch (error) {
-    console.log("❌ Error al responder:", error.response?.data || error.message || error);
-    res.status(500).json({ error: "No se pudo enviar" });
+    console.error("❌ Error al responder:", error.response?.data || error.message || error);
+    res.status(500).json({ 
+      error: "No se pudo enviar",
+      details: error.message 
+    });
   }
 });
 
