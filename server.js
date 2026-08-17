@@ -158,21 +158,43 @@ function containsAny(text, list) {
 }
 
 async function menu(to) {
-  await sendButtonMenu(
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
     to,
-    `👋 ¡Hola! Bienvenid@ a ${BOT_NAME} ✨
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\nPodés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.\n\n¿Qué querés ver ahora?"
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Ver catálogo",
+          url: "https://golosinasaries.github.io/catalogo"
+        }
+      }
+    }
+  });
 
-Podés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.
-
-¿Qué querés ver ahora?`,
-    [
-      { id: "catalogo", title: "🛒 Ver catálogo" },
-      { id: "comprar", title: "📦 Cómo comprar" },
-      { id: "compra_minima", title: "💰 ¿Cuál es la compra mínima?" },
-      { id: "costo_envio", title: "🚚 ¿Cuánto sale el envío?" },
-      { id: "asesor", title: "💬 Hablar con asesor" }
-    ]
-  );
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "💬 Si necesitás ayuda humana."
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Hablar con asesor",
+          url: "https://wa.me/542236010443"
+        }
+      }
+    }
+  });
 }
 
 async function catalogo(to) {
