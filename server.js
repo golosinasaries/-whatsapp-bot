@@ -14,7 +14,8 @@ const GRUPO_WHATSAPP = "https://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad";
 const usuariosConsultandoGrupo = new Set();
 const usuariosIniciados = new Set();
 const usuariosAsesor = new Set();
-const usuariosContadores = new Map(); // Nuevo: contador de preguntas por usuario
+const usuariosContadores = new Map();
+const usuariosOpciones = new Map(); // Nuevo: rastrear qué botones mostrar por usuario
 
 function normalizeText(text = "") {
   return String(text)
@@ -159,53 +160,78 @@ function containsAny(text, list) {
 }
 
 async function menu(to) {
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\nPodés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.\n\n¿Qué querés ver ahora?"
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Ver catálogo",
-          url: "https://golosinasaries.github.io/catalogo"
-        }
-      }
-    }
-  });
+  await sendButtonMenu(to, "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?", [
+    { id: "catalogo", title: "🛒 Ver productos" },
+    { id: "envio", title: "🚚 Cómo es el envío" },
+    { id: "ubicacion", title: "📍 De dónde somos" }
+  ]);
+}
 
-  // Aquí ya NO enviamos la opción de "Hablar con asesor" automáticamente
+// Menú dinámico que agrega opciones según interacciones
+async function menuDinamico(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  const botones = [
+    { id: "catalogo", title: "🛒 Ver productos" },
+    { id: "envio", title: "🚚 Cómo es el envío" },
+    { id: "ubicacion", title: "📍 De dónde somos" }
+  ];
+
+  // Agregar botones dinámicamente según consultas previas
+  if (opciones.has("catalogo")) {
+    botones.push({ id: "compra_minima", title: "💰 Compra mínima" });
+  }
+
+  if (opciones.has("envio")) {
+    botones.push({ id: "costo_envio", title: "📦 Costo del envío" });
+    botones.push({ id: "demora", title: "⏱️ Demora de envío" });
+  }
+
+  if (opciones.has("pago")) {
+    botones.push({ id: "pago", title: "💳 Formas de pago" });
+  }
+
+  // Mostrar asesor después de 3+ interacciones
+  const contador = usuariosContadores.get(to) || 0;
+  if (contador >= 3) {
+    botones.push({ id: "asesor", title: "💬 Hablar con asesor" });
+  }
+
+  await sendButtonMenu(to, "¿En qué más te puedo ayudar?", botones);
 }
 
 // Nueva función para mostrar asesor después de varias preguntas
 async function menuConAsesor(to) {
-  await menu(to);
+  const opciones = usuariosOpciones.get(to) || new Set();
+  const botones = [
+    { id: "catalogo", title: "🛒 Ver productos" },
+    { id: "envio", title: "🚚 Cómo es el envío" },
+    { id: "ubicacion", title: "📍 De dónde somos" }
+  ];
 
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "💬 Si necesitás ayuda humana."
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Hablar con asesor",
-          url: "https://wa.me/542236010443"
-        }
-      }
-    }
-  });
+  if (opciones.has("catalogo")) {
+    botones.push({ id: "compra_minima", title: "💰 Compra mínima" });
+  }
+
+  if (opciones.has("envio")) {
+    botones.push({ id: "costo_envio", title: "📦 Costo del envío" });
+    botones.push({ id: "demora", title: "⏱️ Demora de envío" });
+  }
+
+  if (opciones.has("pago")) {
+    botones.push({ id: "pago", title: "💳 Formas de pago" });
+  }
+
+  botones.push({ id: "asesor", title: "💬 Hablar con asesor" });
+
+  await sendButtonMenu(to, "¿Qué más querés saber?", botones);
 }
 
 async function catalogo(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("catalogo");
+  opciones.add("pago"); // Al ver productos, agregar opción de pago
+  usuariosOpciones.set(to, opciones);
+
   await sendText(
     to,
     `🛒 Catálogo directo:\nhttps://golosinasaries.github.io/catalogo\n\nSi ya elegiste algo, usá el botón "Hacer pedido" dentro del catálogo.`
@@ -213,6 +239,11 @@ async function catalogo(to) {
 }
 
 async function catalogoConGrupo(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("catalogo");
+  opciones.add("pago");
+  usuariosOpciones.set(to, opciones);
+
   usuariosConsultandoGrupo.add(to);
 
   await sendText(
@@ -237,6 +268,84 @@ ${GRUPO_WHATSAPP}`
   );
 }
 
+async function compraMinima(to) {
+  await sendText(
+    to,
+    `💰 La compra mínima es de $50.000.`
+  );
+}
+
+async function costoEnvio(to) {
+  await sendText(
+    to,
+    `📍 Para saber el valor del envío hasta tu localidad 🚚
+
+🛒 Ingresá a nuestra tienda online 👇
+golosinasaries.github.io/catalogo
+
+☰ En el menú de las tres rayitas vas a encontrar la opción *"Costo de envío"*, donde podés consultar el valor según tu localidad 📦`
+  );
+}
+
+async function pago(to) {
+  await sendText(
+    to,
+    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
+  );
+}
+
+async function envios(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("envio");
+  usuariosOpciones.set(to, opciones);
+
+  await sendText(
+    to,
+    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
+  );
+}
+
+async function ubicacion(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("ubicacion");
+  usuariosOpciones.set(to, opciones);
+
+  await sendText(
+    to,
+    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
+  );
+}
+
+async function demora(to) {
+  await sendText(
+    to,
+    `⏱️ Se enviaría por Correo Argentino 📦 y llega en 2 - 5 días hábiles.\n\nLink para realizar el pedido 👇✨\nhttps://golosinasaries.github.io/catalogo`
+  );
+}
+
+async function asesor(to) {
+  usuariosAsesor.add(to);
+
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "Perfecto 😊\n\nTe llevamos directo al chat del asesor."
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Hablar con asesor",
+          url: "https://wa.me/542236010443"
+        }
+      }
+    }
+  });
+}
+
 async function comoComprar(to) {
   await sendText(
     to,
@@ -252,6 +361,10 @@ async function pago(to) {
 }
 
 async function envios(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("envio");
+  usuariosOpciones.set(to, opciones);
+
   await sendText(
     to,
     `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
@@ -259,6 +372,10 @@ async function envios(to) {
 }
 
 async function ubicacion(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("ubicacion");
+  usuariosOpciones.set(to, opciones);
+
   await sendText(
     to,
     `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
@@ -310,7 +427,7 @@ async function costoEnvio(to) {
 🛒 Ingresá a nuestra tienda online 👇
 golosinasaries.github.io/catalogo
 
-☰ En el menú de las tres rayitas vas a encontrar la opción *“Costo de envío”*, donde podés consultar el valor según tu localidad 📦`
+☰ En el menú de las tres rayitas vas a encontrar la opción *"Costo de envío"*, donde podés consultar el valor según tu localidad 📦`
   );
 }
 
@@ -336,11 +453,11 @@ function manejarTextoCliente(from, textoCliente) {
 
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
-    // Mostrar asesor si ya respondimos 3+ preguntas
+    // Mostrar menú dinámico
     if (contador >= 3) {
       return menuConAsesor(from);
     }
-    return menu(from);
+    return menuDinamico(from);
   }
 
   if (
@@ -392,22 +509,6 @@ function manejarTextoCliente(from, textoCliente) {
     ])
   ) {
     return catalogoConGrupo(from);
-  }
-
-  if (
-    containsAny(textoCliente, [
-      "comprar",
-      "pedido",
-      "quiero comprar",
-      "hacer pedido",
-      "como compro",
-      "como comprar",
-      "como hago",
-      "quiero un pedido",
-      "hacer compra"
-    ])
-  ) {
-    return catalogo(from);
   }
 
   if (
@@ -479,15 +580,7 @@ function manejarTextoCliente(from, textoCliente) {
 
   return sendText(
     from,
-    `😅 No entendí bien tu consulta, pero podés elegir una opción:
-
-🛒 Ver catálogo
-📦 Cómo comprar
-💳 Pagos
-🚚 Envíos
-📍 Ubicación
-
-Escribí 'menú' para volver al inicio 😊`
+    `😅 No entendí bien tu consulta, pero podés escribir:\n\n🛒 Productos\n🚚 Envíos\n📍 Ubicación\n\nO escribí 'menú' para volver al inicio 😊`
   );
 }
 
