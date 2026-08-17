@@ -17,6 +17,59 @@ const usuariosIniciados = new Set();
 const usuariosAsesor = new Set();
 const usuariosContadores = new Map();
 const usuariosOpciones = new Map();
+const usuariosEstado = new Map();
+
+const opcionesAleatorias = [
+  {
+    id: "envio",
+    titulo: "🚚 Cómo es el envío"
+  },
+  {
+    id: "costo_envio",
+    titulo: "📦 Costo del envío"
+  },
+  {
+    id: "demora",
+    titulo: "⏱️ Demora de envío"
+  },
+  {
+    id: "pago",
+    titulo: "💳 Formas de pago"
+  },
+  {
+    id: "pago_cnc",
+    titulo: "💳 Pago con tarjeta"
+  },
+  {
+    id: "compra_minima",
+    titulo: "💰 Compra mínima"
+  },
+  {
+    id: "ubicacion",
+    titulo: "📍 De dónde somos"
+  }
+];
+
+const usuariosUltimaActividad = new Map(); 
+const usuariosNotificadosInactividad = new Set(); 
+const timersInactividad = new Map();
+
+function activarInactividad(from) {
+
+  if (timersInactividad.has(from)) {
+    clearTimeout(timersInactividad.get(from));
+  }
+
+  const timer = setTimeout(async () => {
+
+    await seguimientoInactividad(from);
+
+    timersInactividad.delete(from);
+
+  }, 30 * 60 * 1000);
+
+  timersInactividad.set(from, timer);
+}
 
 function normalizeText(text = "") {
   return String(text)
@@ -85,7 +138,21 @@ async function sendWhatsApp(payload) {
     "Content-Type": "application/json"
   };
 
-  await axios.post(URL, payload, { headers });
+  console.log(`📡 POST a ${URL}`);
+  console.log(`📦 Payload:`, JSON.stringify(payload, null, 2));
+
+  try {
+
+    console.log("TOKEN:", process.env.WHATSAPP_TOKEN?.slice(0,20));
+    console.log("PHONE:", process.env.PHONE_NUMBER_ID);
+    const response = await axios.post(URL, payload, { headers });
+    console.log(`✅ Respuesta WhatsApp:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.log(JSON.stringify(error.response?.data,null,2));
+    console.error(`❌ Error WhatsApp API:`, error.response?.data || error.message);
+    throw error;
+  }
 }
 
 async function sendText(to, mensaje) {
@@ -135,33 +202,36 @@ async function sendButtonMenu(to, body, buttons) {
 }
 
 async function responderDesdeAdmin(to, tipo, contenido) {
+  console.log(`\n🔍 Preparando respuesta desde admin`);
+  console.log(`   to: ${to}`);
+  console.log(`   tipo: ${tipo}`);
+  console.log(`   contenido: ${contenido}`);
+
+  if (!to || !contenido) {
+    throw new Error("Faltan parámetros: to o contenido");
+  }
+
   const payload = {
     messaging_product: "whatsapp",
-    to,
+    to: String(to).trim(),
     type: tipo
   };
 
   if (tipo === "text") {
-    payload.text = { body: contenido };
+    payload.text = { body: String(contenido) };
+  } else if (tipo === "image") {
+    payload.image = { link: String(contenido) };
+  } else if (tipo === "video") {
+    payload.video = { link: String(contenido) };
+  } else if (tipo === "audio") {
+    payload.audio = { link: String(contenido) };
+  } else if (tipo === "document") {
+    payload.document = { link: String(contenido) };
   }
 
-  if (tipo === "image") {
-    payload.image = { link: contenido };
-  }
-
-  if (tipo === "video") {
-    payload.video = { link: contenido };
-  }
-
-  if (tipo === "audio") {
-    payload.audio = { link: contenido };
-  }
-
-  if (tipo === "document") {
-    payload.document = { link: contenido };
-  }
-
+  console.log(`📤 Llamando sendWhatsApp...`);
   await sendWhatsApp(payload);
+  console.log(`✅ Mensaje registrado en base de datos`);
 
   registrarMensaje({
     from: to,
@@ -175,6 +245,8 @@ async function responderDesdeAdmin(to, tipo, contenido) {
 function containsAny(text, list) {
   return list.some((item) => text.includes(item));
 }
+
+
 
 // ===== MENÚS =====
 async function menu(to) {
@@ -277,8 +349,8 @@ async function menuDinamico(to) {
     botones.push({
       type: "reply",
       reply: {
-        id: "pago",
-        title: "💳 Formas de pago"
+        id: "pago_cnc",
+        title: "💳 Pago con tarjeta"
       }
     });
   }
@@ -320,7 +392,48 @@ async function menuDinamico(to) {
 
 // ===== RESPUESTAS =====
 
+async function seguimientoInactividad(to) {
+
+  await sendText(
+    to,
+    `😊 ¿Pudiste ver nuestro catálogo?\n\n🛒 Te lo dejo nuevamente por acá 👇✨\ngolosinasaries.github.io/catalogo`
+  );
+
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: {
+        text: "¿Necesitás ayuda?"
+      },
+      action: {
+        buttons: [
+          {
+            type: "url",
+            text: "🛒 Ver productos",
+            url: "https://golosinasaries.github.io/catalogo"
+          },
+          {
+            type: "reply",
+            reply: {
+              id: "asesor",
+              title: "💬 Hablar con asesor"
+            }
+          }
+        ]
+      }
+    }
+  });
+
+}
+
 async function compraMinima(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("compra_minima");
+  usuariosOpciones.set(to, opciones);
+
   await sendText(to, `💰 La compra mínima es de $50.000.`);
   await botonesSiguientes(to);
 }
@@ -401,7 +514,7 @@ async function asesor(to) {
         name: "cta_url",
         parameters: {
           display_text: "Hablar con asesor",
-          url: `https://wa.me/54${NUMERO_VENTAS}`
+          url: `https://wa.me/54${NUMERO_VENTAS}?text=Quiero%20hablar%20con%20un%20asesor%20de%20Golosinas%20Aries`
         }
       }
     }
@@ -447,27 +560,41 @@ async function invitacionGrupo(to) {
   await botonesSiguientes(to);
 }
 
-// Función para enviar botones después de cada respuesta
 async function botonesSiguientes(to) {
   const opciones = usuariosOpciones.get(to) || new Set();
   const botones = [
-    {
-      type: "url",
-      text: "🛒 Ver productos",
-      url: "https://golosinasaries.github.io/catalogo"
-    }
-  ];
+  {
+    type: "url",
+    text: "🛒 Ver productos",
+    url: "https://golosinasaries.github.io/catalogo"
+  },
+  {
+    type: "url",
+    text: "📢 Unirme al grupo",
+    url: GRUPO_WHATSAPP
 
-  // Agregar botones dinámicamente según consultas previas
-  if (opciones.has("catalogo")) {
+  }
+];
+
+  const usadas = usuariosOpciones.get(to) || new Set();
+
+  let disponibles = opcionesAleatorias.filter(
+    (opcion) => !usadas.has(opcion.id)
+  );
+
+  disponibles = disponibles.sort(() => Math.random() - 0.5);
+
+  const elegir = disponibles.slice(0, 1);
+
+  elegir.forEach((opcion) => {
     botones.push({
       type: "reply",
       reply: {
-        id: "compra_minima",
-        title: "💰 Compra mínima"
+        id: opcion.id,
+        title: opcion.titulo
       }
     });
-  }
+  });
 
   if (opciones.has("envio")) {
     botones.push({
@@ -515,7 +642,6 @@ async function botonesSiguientes(to) {
 
   const contador = usuariosContadores.get(to) || 0;
   if (contador >= 3) {
-    // Reemplazar último botón por asesor
     botones.pop();
     botones.push({
       type: "reply",
@@ -526,7 +652,6 @@ async function botonesSiguientes(to) {
     });
   }
 
-  // Limitar a máximo 3 botones por mensaje
   const botonesFinal = botones.slice(0, 3);
 
   await sendWhatsApp({
@@ -556,9 +681,87 @@ async function botonesSiguientes(to) {
 async function manejarTextoCliente(from, textoCliente) {
   if (!textoCliente) return;
 
-  if (usuariosAsesor.has(from)) {
-    console.log("Usuario está con asesor, no respondo");
+  if (timersInactividad.has(from)) {
+    clearTimeout(timersInactividad.get(from));
+    timersInactividad.delete(from);
+  }
+
+  const estado = usuariosEstado.get(from);
+
+  if (estado === "provincia") {
+    usuariosEstado.set(from, "comercio");
+
+    await sendText(
+      from,
+      `Genial, hacemos envíos por Correo Argentino y llegaría en 2 - 5 días hábiles. 📦🙌\n\n¿Tenés kiosco, comercio o algún evento?`
+    );
+
+    activarInactividad(from);
+
     return;
+  }
+
+  if (estado === "comercio") {
+
+    if (
+      containsAny(textoCliente, [
+        "kiosco",
+        "quiosco",
+        "kiosko",
+        "comercio",
+        "negocio",
+        "local",
+        "emprendimiento",
+        "emprender",
+        "emprendo",
+        "empezando",
+        "empezando con esto",
+        "estoy empezando",
+        "arrancando",
+        "voy a empezar",
+        "probando",
+        "estoy probando",
+        "vendo",
+        "revendo",
+        "revendedor",
+        "venta",
+        "ventas",
+        "tengo un puesto",
+        "tengo un local",
+        "tengo negocio",
+        "soy comerciante",
+        "si",
+        "sí"
+      ])
+    ) {
+      usuariosEstado.delete(from);
+
+      await invitacionGrupo(from);
+      return;
+    }
+
+    if (
+      containsAny(textoCliente, [
+        "evento",
+        "fiesta",
+        "cumple",
+        "cumpleaños"
+      ])
+    ) {
+      usuariosEstado.delete(from);
+
+      await sendText(
+        from,
+        `¡Buenísimo! 🎉 Tenemos muchas opciones ideales para eventos.\n\nPodés ver todos nuestros productos acá 👇✨\ngolosinasaries.github.io/catalogo`
+      );
+
+      await botonesSiguientes(from);
+      return;
+    }
+  }
+
+  if (usuariosAsesor.has(from)) {
+    usuariosAsesor.delete(from);
   }
 
   const contador = (usuariosContadores.get(from) || 0) + 1;
@@ -735,6 +938,9 @@ app.post("/webhook", async (req, res) => {
 
   const from = message.from;
 
+  // ← AGREGAR ESTA LÍNEA AL INICIO
+  await verificarInactividad(from);
+
   if (
     message.type === "text" ||
     message.type === "image" ||
@@ -778,6 +984,7 @@ app.post("/webhook", async (req, res) => {
 
     if (!usuariosIniciados.has(from)) {
       usuariosIniciados.add(from);
+      usuariosEstado.set(from, "provincia");
       await menu(from);
       return;
     }
@@ -788,14 +995,12 @@ app.post("/webhook", async (req, res) => {
   if (message.type === "interactive") {
     const id = message.interactive?.button_reply?.id;
 
-    // Incrementar contador para TODOS los botones reply
     if (id && id !== "menu") {
       const contador = (usuariosContadores.get(from) || 0) + 1;
       usuariosContadores.set(from, contador);
       console.log(`Contador ${from}: ${contador}`);
     }
 
-    // Manejar cada botón
     if (id === "compra_minima") {
       await compraMinima(from);
       return;
@@ -807,7 +1012,6 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (id === "asesor") {
-      // Verificar que tenga 3+ interacciones
       const contador = usuariosContadores.get(from) || 0;
       if (contador < 3) {
         await sendText(from, "Por favor respondé más preguntas primero 😊");
@@ -973,16 +1177,19 @@ app.get("/admin", protegerAdmin, (req, res) => {
         flex: 1;
         overflow: auto;
         margin-bottom: 15px;
+        border: 1px solid #ddd;
+        padding: 10px;
+        background: white;
       }
       .burbuja {
         padding: 10px;
-        margin: 10px;
+        margin: 5px 0;
         border-radius: 10px;
         max-width: 65%;
         word-break: break-word;
       }
       .entrada {
-        background: white;
+        background: #f0f0f0;
       }
       .salida {
         background: #dff7d7;
@@ -994,6 +1201,7 @@ app.get("/admin", protegerAdmin, (req, res) => {
         margin-bottom: 10px;
         resize: vertical;
         box-sizing: border-box;
+        padding: 10px;
       }
       button {
         padding: 12px 16px;
@@ -1007,6 +1215,16 @@ app.get("/admin", protegerAdmin, (req, res) => {
       button:hover {
         background: #1fa952;
       }
+      #status {
+        margin-top: 10px;
+        font-size: 12px;
+      }
+      .error {
+        color: red;
+      }
+      .success {
+        color: green;
+      }
     </style>
   </head>
   <body>
@@ -1016,19 +1234,22 @@ app.get("/admin", protegerAdmin, (req, res) => {
         <input type="text" id="numeroNuevo" placeholder="Ingresa el número (ej: 5491234567890)">
         <button onclick="irAlCliente()">Ir al cliente</button>
       </div>
-      <h3>Clientes previos</h3>
-      ${clientesHTML}
+      <h3>Clientes previos (${clientes.length})</h3>
+      ${clientesHTML || "<p>Sin clientes</p>"}
     </div>
 
     <div id="chat">
-      <h2>${escapeHTML(cliente)}</h2>
+      <h2>${escapeHTML(cliente) || "Selecciona un cliente"}</h2>
 
       <div class="mensajes">
-        ${mensajesHTML}
+        ${mensajesHTML || "<p>Sin mensajes</p>"}
       </div>
 
-      <textarea id="mensaje" placeholder="Escribir mensaje..."></textarea>
-      <button onclick="enviar()">Enviar</button>
+      ${cliente ? `
+        <textarea id="mensaje" placeholder="Escribir mensaje..." autofocus></textarea>
+        <button onclick="enviar()">Enviar</button>
+        <div id="status"></div>
+      ` : "<p style='color: gray;'>Selecciona un cliente o ingresa uno nuevo para enviar mensajes</p>"}
     </div>
 
     <script>
@@ -1042,22 +1263,55 @@ app.get("/admin", protegerAdmin, (req, res) => {
       }
 
       async function enviar() {
-        const mensaje = document.getElementById("mensaje").value;
-        if (!mensaje.trim()) return;
+        const mensaje = document.getElementById("mensaje").value.trim();
+        const status = document.getElementById("status");
+        
+        if (!mensaje) {
+          status.innerHTML = '<p class="error">El mensaje no puede estar vacío</p>';
+          return;
+        }
 
-        await fetch("/responder", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            to: "${escapeHTML(cliente)}",
-            mensaje
-          })
-        });
+        try {
+          status.innerHTML = '<p>⏳ Enviando...</p>';
+          
+          const response = await fetch("/responder", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              to: "${escapeHTML(cliente)}",
+              mensaje: mensaje
+            })
+          });
 
-        location.reload();
+          const data = await response.json();
+
+          if (response.ok) {
+            status.innerHTML = '<p class="success">✅ Mensaje enviado correctamente</p>';
+            document.getElementById("mensaje").value = "";
+            setTimeout(() => location.reload(), 1500);
+          } else {
+            status.innerHTML = '<p class="error">❌ Error: ' + (data.error || "Desconocido") + '</p>';
+            console.error("Error response:", data);
+          }
+        } catch (err) {
+          status.innerHTML = '<p class="error">❌ Error de conexión: ' + err.message + '</p>';
+          console.error("Network error:", err);
+        }
       }
+
+      document.addEventListener("DOMContentLoaded", function() {
+        const textarea = document.getElementById("mensaje");
+        if (textarea) {
+          textarea.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              enviar();
+            }
+          });
+        }
+      });
     </script>
   </body>
   </html>
@@ -1069,21 +1323,32 @@ app.get("/admin", protegerAdmin, (req, res) => {
 app.post("/responder", async (req, res) => {
   const { to, mensaje, tipo = "text" } = req.body;
 
-  console.log(`Admin intenta responder a ${to}: ${mensaje}`);
+  console.log(`\n📨 === NUEVO RESPONDER ===`);
+  console.log(`📤 Admin intenta responder a: ${to}`);
+  console.log(`💬 Mensaje: ${mensaje}`);
+  console.log(`📋 Tipo: ${tipo}`);
 
   if (!to || !mensaje) {
-    return res.status(400).json({ error: "Faltan datos" });
+    console.error("❌ ERROR: Faltan datos");
+    return res.status(400).json({ error: "Faltan datos: to y mensaje son requeridos" });
   }
 
   try {
+    console.log(`🚀 Llamando responderDesdeAdmin...`);
     await responderDesdeAdmin(to, tipo, mensaje);
-    res.json({ ok: true });
-    console.log(`✅ Respuesta enviada a ${to}`);
+    
+    console.log(`✅ ÉXITO: Respuesta enviada a ${to}`);
+    res.json({ ok: true, message: "Mensaje enviado correctamente" });
   } catch (error) {
-    console.error("❌ Error al responder:", error.response?.data || error.message || error);
+    console.error(`\n❌ ERROR COMPLETO:`);
+    console.error(`   Mensaje: ${error.message}`);
+    console.error(`   Status: ${error.response?.status}`);
+    console.error(`   Data: ${JSON.stringify(error.response?.data)}`);
+    
     res.status(500).json({ 
-      error: "No se pudo enviar",
-      details: error.message 
+      error: "No se pudo enviar el mensaje",
+      details: error.message,
+      whatsapp_error: error.response?.data?.error?.message
     });
   }
 });

@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "from": "5492236690706",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T15:29:31.866Z",
+    "estado": "humano",
+    "direccion": "salida"
+  },
+  {
+    "from": "5492236690706",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T16:51:59.771Z",
+    "estado": "humano",
+    "direccion": "salida"
+  },
+  {
+    "from": "5492236690706",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T16:54:57.983Z",
+    "estado": "humano",
+    "direccion": "salida"
+  }
+]
