@@ -9,6 +9,8 @@ app.use(express.json());
 const ARCHIVO = "./conversaciones.json";
 const NUMERO_VENTAS = "2236010443";
 const BOT_NAME = "Golosinas Aries";
+const GRUPO_WHATSAPP = "https://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad";
+const usuariosConsultandoGrupo = new Set();
 
 function normalizeText(text = "") {
   return String(text)
@@ -177,6 +179,31 @@ async function catalogo(to) {
   );
 }
 
+async function catalogoConGrupo(to) {
+  usuariosConsultandoGrupo.add(to);
+
+  await sendText(
+    to,
+    `***** Todo lo disponible lo encontrás en nuestro catálogo ***** 👇🏻✨
+
+golosinasaries.github.io/catalogo 💖
+
+📢 En caso de nuevos ingresos o reposición de productos, lo estaremos anunciando en el grupo.
+
+¿Te gustaría unirte a nuestro grupo de WhatsApp?`
+  );
+}
+
+async function invitacionGrupo(to) {
+  usuariosConsultandoGrupo.delete(to);
+
+  await sendText(
+    to,
+    `Te invito a sumarte a nuestro grupo de WhatsApp ☺️
+${GRUPO_WHATSAPP}`
+  );
+}
+
 async function comoComprar(to) {
   await sendText(
     to,
@@ -241,6 +268,17 @@ function manejarTextoCliente(from, textoCliente) {
 
   if (usuariosAsesor.has(from)) return;
 
+  if (usuariosConsultandoGrupo.has(from)) {
+    if (containsAny(textoCliente, ["si", "sí", "quiero", "sumarme", "unirme", "dale"])) {
+      return invitacionGrupo(from);
+    }
+
+    if (containsAny(textoCliente, ["no", "gracias", "nah", "no quiero"])) {
+      usuariosConsultandoGrupo.delete(from);
+      return sendText(from, "No hay problema 😊");
+    }
+  }
+
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
     return menu(from);
@@ -254,10 +292,20 @@ function manejarTextoCliente(from, textoCliente) {
       "precio",
       "precios",
       "ver catalogo",
-      "ver catálogo"
+      "ver catálogo",
+      "tenemos algo",
+      "tenes algo",
+      "tienen algo",
+      "tienen productos",
+      "hay algo",
+      "hay stock",
+      "que tienen",
+      "qué tienen",
+      "disponible",
+      "estan disponibles"
     ])
   ) {
-    return catalogo(from);
+    return catalogoConGrupo(from);
   }
 
   if (
@@ -345,7 +393,15 @@ function manejarTextoCliente(from, textoCliente) {
 
   return sendText(
     from,
-    `😅 No entendí bien tu consulta, pero podés elegir una opción:\n\n🛒 Ver catálogo\n📦 Cómo comprar\n💳 Pagos\n🚚 Envíos\n📍 Ubicación\n\nEscribí 'menú' para volver al inicio 😊`
+    `😅 No entendí bien tu consulta, pero podés elegir una opción:
+
+🛒 Ver catálogo
+📦 Cómo comprar
+💳 Pagos
+🚚 Envíos
+📍 Ubicación
+
+Escribí 'menú' para volver al inicio 😊`
   );
 }
 
