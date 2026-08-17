@@ -108,9 +108,11 @@ app.post("/webhook",async(req,res)=>{
     }
 
 
-    if(
+   if(
       textoCliente.includes("comprar")||
       textoCliente.includes("pedido")||
+      textoCliente.includes("quiero comprar")||
+      textoCliente.includes("hacer pedido")||
       textoCliente.includes("como compro")||
       textoCliente.includes("cómo compro")
     ){
@@ -128,10 +130,44 @@ app.post("/webhook",async(req,res)=>{
       return;
     }
 
+    if(
+  textoCliente.includes("envio")||
+  textoCliente.includes("envíos")||
+  textoCliente.includes("envios")||
+  textoCliente.includes("correo")
+){
+  await envios(from);
+  return;
+}
+
+
+if(
+  textoCliente.includes("donde")||
+  textoCliente.includes("dónde")||
+  textoCliente.includes("ubicacion")||
+  textoCliente.includes("ubicación")||
+  textoCliente.includes("miramar")
+){
+  await ubicacion(from);
+  return;
+}
+
+
+  if(
+    textoCliente.includes("demora")||
+    textoCliente.includes("cuanto tarda")||
+    textoCliente.includes("cuánto tarda")||
+    textoCliente.includes("tiempo")
+  ){
+    await demora(from);
+    return;
+  }
 
     if(
       textoCliente.includes("asesor")||
       textoCliente.includes("persona")||
+      textoCliente.includes("humano")||
+      textoCliente.includes("vendedor")||
       textoCliente.includes("ayuda")
     ){
       await asesor(from);
@@ -152,12 +188,19 @@ app.post("/webhook",async(req,res)=>{
     }
 
 
-    await texto(
+   await texto(
       from,
-      "😅 Perdón, no llegué a entenderte.\n\nContame qué necesitás y te ayudo 😊"
-    );
+    `😅 No llegué a entender tu consulta.
 
-    await menu(from);
+    Puedo ayudarte con:
+    🛒 Productos
+    📦 Cómo comprar
+    💳 Pagos
+    🚚 Envíos
+    📍 Ubicación
+
+    Escribime qué necesitás 😊`
+    );
   }
 
 
@@ -218,65 +261,146 @@ function protegerAdmin(req,res,next){
 
 }
 
+console.log("ADMIN CARGADO");
+
 app.get("/admin",protegerAdmin,(req,res)=>{
 
-  let html = `
-  <html>
-  <head>
-    <title>Golosinas Aries - Atención</title>
-    <style>
-      body{
-        font-family:Arial;
-        padding:20px;
-        background:#f5f5f5;
-      }
-      .mensaje{
-        background:white;
-        padding:15px;
-        margin-bottom:10px;
-        border-radius:10px;
-      }
-      .humano{
-        border-left:5px solid green;
-      }
-      .bot{
-        border-left:5px solid blue;
-      }
-    </style>
-  </head>
+const clientes=[...new Set(mensajes.map(m=>m.from))];
 
-  <body>
+let cliente=req.query.cliente || clientes[0] || "";
 
-  <h1>💬 Golosinas Aries - Atención</h1>
+let conversacion=mensajes.filter(m=>m.from===cliente);
 
-  `;
+let html=`
+<html>
+<head>
+<title>Golosinas Aries</title>
+
+<style>
+body{
+font-family:Arial;
+margin:0;
+display:flex;
+height:100vh;
+background:#eee;
+}
+
+#clientes{
+width:300px;
+background:white;
+border-right:1px solid #ccc;
+padding:15px;
+overflow:auto;
+}
+
+.cliente{
+padding:12px;
+border-bottom:1px solid #ddd;
+}
+
+.cliente a{
+text-decoration:none;
+color:black;
+}
+
+#chat{
+flex:1;
+display:flex;
+flex-direction:column;
+padding:20px;
+}
+
+.mensajes{
+flex:1;
+overflow:auto;
+}
+
+.burbuja{
+padding:10px;
+margin:10px;
+border-radius:10px;
+max-width:60%;
+}
+
+.entrada{
+background:white;
+}
+
+.salida{
+background:#c8f7c5;
+margin-left:auto;
+}
+
+textarea{
+height:60px;
+}
+
+button{
+padding:12px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="clientes">
+
+<h2>Clientes</h2>
+
+`;
+
+clientes.forEach(c=>{
+
+html+=`
+
+<div class="cliente">
+<a href="/admin?cliente=${c}">
+${c}
+</a>
+</div>
+
+`;
+
+});
 
 
-  mensajes.slice().reverse().forEach(m=>{
+html+=`
 
-    html += `
-    <div class="mensaje ${m.estado}">
-      <b>Cliente:</b> ${m.from}<br>
-      <b>Tipo:</b> ${m.tipo || "texto"}<br>
-      <b>Mensaje:</b> ${m.texto}<br>
-      <b>Fecha:</b> ${m.fecha}<br>
-      <b>Estado:</b> ${m.estado}
-    </div>
-    `;
+</div>
 
-  });
 
-  html += `
+<div id="chat">
 
-<h2>Responder cliente</h2>
+<h2>${cliente}</h2>
 
-<input id="cliente" placeholder="Número WhatsApp">
 
-<br><br>
+<div class="mensajes">
 
-<textarea id="mensaje" placeholder="Escribí el mensaje"></textarea>
+`;
 
-<br><br>
+conversacion.forEach(m=>{
+
+html+=`
+
+<div class="burbuja ${m.direccion}">
+${m.texto}
+<br>
+<small>${m.fecha}</small>
+</div>
+
+`;
+
+});
+
+
+html+=`
+
+</div>
+
+
+<textarea id="mensaje" placeholder="Escribir mensaje..."></textarea>
 
 <button onclick="enviar()">Enviar</button>
 
@@ -285,10 +409,7 @@ app.get("/admin",protegerAdmin,(req,res)=>{
 
 async function enviar(){
 
-const to=document.getElementById("cliente").value;
-
-const mensaje=document.getElementById("mensaje").value;
-
+let mensaje=document.getElementById("mensaje").value;
 
 await fetch("/responder",{
 
@@ -299,40 +420,37 @@ headers:{
 },
 
 body:JSON.stringify({
-to,
-mensaje,
-tipo:"text"
+to:"${cliente}",
+mensaje
 })
 
 });
 
 
-alert("Mensaje enviado");
+location.reload();
 
 }
 
 </script>
 
+
+</div>
+
+</body>
+</html>
 `;
 
-  html += `
-  </body>
-  </html>
-  `;
-
-
-  res.send(html);
+res.send(html);
 
 });
 
 async function menu(to){
   await enviarBoton(
     to,
-    "👋 ¡Hola! Bienvenid@ a Golosinas Aries ♈🔥\n\n🇦🇷 Enviamos a todo el país\n📍 Desde Miramar, Buenos Aires\n\n¿Qué querés hacer?",
+    "👋 ¡Hola! Bienvenid@ a Golosinas Aries ♈🔥\n\nPuedo ayudarte con información sobre productos, compras, pagos y envíos.\n\n¿Qué querés consultar?",
     [
       {id:"catalogo",title:"🛒 Ver catálogo"},
-      {id:"comprar",title:"📦 ¿Cómo comprar?"},
-      {id:"asesor",title:"💬 Hablar con asesor"}
+      {id:"comprar",title:"📦 ¿Cómo comprar?"}
     ]
   );
 }
@@ -361,6 +479,18 @@ https://golosinasaries.github.io/catalogo
   );
 }
 
+async function pasarVentas(to){
+
+  await texto(
+    to,
+`🛒 ¡Perfecto! Para finalizar tu compra te atendemos por nuestro WhatsApp de ventas:
+
+📲 2236010443
+
+Escribinos ahí y seguimos con tu pedido 😊`
+  );
+
+}
 
 async function pago(to){
   await texto(
@@ -377,6 +507,36 @@ https://www.instagram.com/golosinasaries`
   );
 }
 
+async function envios(to){
+  await texto(
+    to,
+`🚚 Realizamos envíos a todo el país.
+
+Trabajamos con Correo Argentino y otros medios según la zona.
+
+Decime de dónde sos y te ayudo 😊`
+  );
+}
+
+
+async function ubicacion(to){
+  await texto(
+    to,
+`📍 Estamos en Miramar, Buenos Aires.
+
+Hacemos envíos a todo el país 🇦🇷`
+  );
+}
+
+
+async function demora(to){
+  await texto(
+    to,
+`⏱️ Los tiempos dependen de la localidad y del medio de envío.
+
+Si me decís tu ciudad te puedo orientar 😊`
+  );
+}
 
 async function asesor(to){
 
@@ -568,4 +728,6 @@ const PORT=process.env.PORT||3000;
 
 app.listen(PORT,()=>{
   console.log(`Bot funcionando en el puerto ${PORT}`);
+}).on("error",err=>{
+  console.log(err);
 });
