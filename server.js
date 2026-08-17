@@ -15,7 +15,7 @@ const usuariosConsultandoGrupo = new Set();
 const usuariosIniciados = new Set();
 const usuariosAsesor = new Set();
 const usuariosContadores = new Map();
-const usuariosOpciones = new Map(); // Nuevo: rastrear qué botones mostrar por usuario
+const usuariosOpciones = new Map();
 
 function normalizeText(text = "") {
   return String(text)
@@ -94,6 +94,14 @@ async function sendText(to, mensaje) {
     type: "text",
     text: { body: mensaje }
   });
+
+  registrarMensaje({
+    from: to,
+    tipo: "text",
+    texto: mensaje,
+    estado: "bot",
+    direccion: "salida"
+  });
 }
 
 async function sendButtonMenu(to, body, buttons) {
@@ -114,6 +122,14 @@ async function sendButtonMenu(to, body, buttons) {
         }))
       }
     }
+  });
+
+  registrarMensaje({
+    from: to,
+    tipo: "interactive",
+    texto: body,
+    estado: "bot",
+    direccion: "salida"
   });
 }
 
@@ -159,6 +175,7 @@ function containsAny(text, list) {
   return list.some((item) => text.includes(item));
 }
 
+// ===== MENÚS =====
 async function menu(to) {
   await sendButtonMenu(to, "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?", [
     { id: "catalogo", title: "🛒 Ver productos" },
@@ -167,7 +184,6 @@ async function menu(to) {
   ]);
 }
 
-// Menú dinámico que agrega opciones según interacciones
 async function menuDinamico(to) {
   const opciones = usuariosOpciones.get(to) || new Set();
   const botones = [
@@ -176,7 +192,6 @@ async function menuDinamico(to) {
     { id: "ubicacion", title: "📍 De dónde somos" }
   ];
 
-  // Agregar botones dinámicamente según consultas previas
   if (opciones.has("catalogo")) {
     botones.push({ id: "compra_minima", title: "💰 Compra mínima" });
   }
@@ -190,7 +205,6 @@ async function menuDinamico(to) {
     botones.push({ id: "pago", title: "💳 Formas de pago" });
   }
 
-  // Mostrar asesor después de 3+ interacciones
   const contador = usuariosContadores.get(to) || 0;
   if (contador >= 3) {
     botones.push({ id: "asesor", title: "💬 Hablar con asesor" });
@@ -199,43 +213,89 @@ async function menuDinamico(to) {
   await sendButtonMenu(to, "¿En qué más te puedo ayudar?", botones);
 }
 
-// Nueva función para mostrar asesor después de varias preguntas
-async function menuConAsesor(to) {
-  const opciones = usuariosOpciones.get(to) || new Set();
-  const botones = [
-    { id: "catalogo", title: "🛒 Ver productos" },
-    { id: "envio", title: "🚚 Cómo es el envío" },
-    { id: "ubicacion", title: "📍 De dónde somos" }
-  ];
-
-  if (opciones.has("catalogo")) {
-    botones.push({ id: "compra_minima", title: "💰 Compra mínima" });
-  }
-
-  if (opciones.has("envio")) {
-    botones.push({ id: "costo_envio", title: "📦 Costo del envío" });
-    botones.push({ id: "demora", title: "⏱️ Demora de envío" });
-  }
-
-  if (opciones.has("pago")) {
-    botones.push({ id: "pago", title: "💳 Formas de pago" });
-  }
-
-  botones.push({ id: "asesor", title: "💬 Hablar con asesor" });
-
-  await sendButtonMenu(to, "¿Qué más querés saber?", botones);
+// ===== RESPUESTAS =====
+async function compraMinima(to) {
+  await sendText(to, `💰 La compra mínima es de $50.000.`);
+  await menuDinamico(to);
 }
 
-async function catalogo(to) {
+async function costoEnvio(to) {
+  await sendText(
+    to,
+    `📍 Para saber el valor del envío hasta tu localidad 🚚\n\n🛒 Ingresá a nuestra tienda online 👇\ngolosinasaries.github.io/catalogo\n\n☰ En el menú de las tres rayitas vas a encontrar la opción *"Costo de envío"*, donde podés consultar el valor según tu localidad 📦`
+  );
+  await menuDinamico(to);
+}
+
+async function pago(to) {
+  await sendText(
+    to,
+    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
+  );
+  await menuDinamico(to);
+}
+
+async function envios(to) {
   const opciones = usuariosOpciones.get(to) || new Set();
-  opciones.add("catalogo");
-  opciones.add("pago"); // Al ver productos, agregar opción de pago
+  opciones.add("envio");
   usuariosOpciones.set(to, opciones);
 
   await sendText(
     to,
-    `🛒 Catálogo directo:\nhttps://golosinasaries.github.io/catalogo\n\nSi ya elegiste algo, usá el botón "Hacer pedido" dentro del catálogo.`
+    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
   );
+  await menuDinamico(to);
+}
+
+async function ubicacion(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("ubicacion");
+  usuariosOpciones.set(to, opciones);
+
+  await sendText(
+    to,
+    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
+  );
+  await menuDinamico(to);
+}
+
+async function demora(to) {
+  await sendText(
+    to,
+    `⏱️ Se enviaría por Correo Argentino 📦 y llega en 2 - 5 días hábiles.\n\nLink para realizar el pedido 👇✨\nhttps://golosinasaries.github.io/catalogo`
+  );
+  await menuDinamico(to);
+}
+
+async function asesor(to) {
+  usuariosAsesor.add(to);
+
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "Perfecto 😊\n\nTe llevamos directo al chat del asesor."
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Hablar con asesor",
+          url: `https://wa.me/54${NUMERO_VENTAS}`
+        }
+      }
+    }
+  });
+
+  registrarMensaje({
+    from: to,
+    tipo: "interactive",
+    texto: "Redirigido a asesor",
+    estado: "bot",
+    direccion: "salida"
+  });
 }
 
 async function catalogoConGrupo(to) {
@@ -248,13 +308,7 @@ async function catalogoConGrupo(to) {
 
   await sendText(
     to,
-    `***** Todo lo disponible lo encontrás en nuestro catálogo ***** 👇🏻✨
-
-golosinasaries.github.io/catalogo 💖
-
-📢 En caso de nuevos ingresos, lo estaremos anunciando en el grupo.
-
-¿Te gustaría unirte a nuestro grupo de WhatsApp?`
+    `***** Todo lo disponible lo encontrás en nuestro catálogo ***** 👇🏻✨\n\ngolosinasaries.github.io/catalogo 💖\n\n📢 En caso de nuevos ingresos, lo estaremos anunciando en el grupo.\n\n¿Te gustaría unirte a nuestro grupo de WhatsApp?`
   );
 }
 
@@ -263,180 +317,18 @@ async function invitacionGrupo(to) {
 
   await sendText(
     to,
-    `Te invito a sumarte a nuestro grupo de WhatsApp ☺️
-${GRUPO_WHATSAPP}`
-  );
-}
-
-async function compraMinima(to) {
-  await sendText(
-    to,
-    `💰 La compra mínima es de $50.000.`
-  );
-}
-
-async function costoEnvio(to) {
-  await sendText(
-    to,
-    `📍 Para saber el valor del envío hasta tu localidad 🚚
-
-🛒 Ingresá a nuestra tienda online 👇
-golosinasaries.github.io/catalogo
-
-☰ En el menú de las tres rayitas vas a encontrar la opción *"Costo de envío"*, donde podés consultar el valor según tu localidad 📦`
-  );
-}
-
-async function pago(to) {
-  await sendText(
-    to,
-    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
-  );
-}
-
-async function envios(to) {
-  const opciones = usuariosOpciones.get(to) || new Set();
-  opciones.add("envio");
-  usuariosOpciones.set(to, opciones);
-
-  await sendText(
-    to,
-    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
-  );
-}
-
-async function ubicacion(to) {
-  const opciones = usuariosOpciones.get(to) || new Set();
-  opciones.add("ubicacion");
-  usuariosOpciones.set(to, opciones);
-
-  await sendText(
-    to,
-    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
-  );
-}
-
-async function demora(to) {
-  await sendText(
-    to,
-    `⏱️ Se enviaría por Correo Argentino 📦 y llega en 2 - 5 días hábiles.\n\nLink para realizar el pedido 👇✨\nhttps://golosinasaries.github.io/catalogo`
-  );
-}
-
-async function asesor(to) {
-  usuariosAsesor.add(to);
-
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "Perfecto 😊\n\nTe llevamos directo al chat del asesor."
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Hablar con asesor",
-          url: "https://wa.me/542236010443"
-        }
-      }
-    }
-  });
-}
-
-async function comoComprar(to) {
-  await sendText(
-    to,
-    `🛒 Catálogo directo:\nhttps://golosinasaries.github.io/catalogo\n\nSi ya elegiste algo, usá el botón "Hacer pedido" dentro del catálogo.`
-  );
-}
-
-async function pago(to) {
-  await sendText(
-    to,
-    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
-  );
-}
-
-async function envios(to) {
-  const opciones = usuariosOpciones.get(to) || new Set();
-  opciones.add("envio");
-  usuariosOpciones.set(to, opciones);
-
-  await sendText(
-    to,
-    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
-  );
-}
-
-async function ubicacion(to) {
-  const opciones = usuariosOpciones.get(to) || new Set();
-  opciones.add("ubicacion");
-  usuariosOpciones.set(to, opciones);
-
-  await sendText(
-    to,
-    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
-  );
-}
-
-async function demora(to) {
-  await sendText(
-    to,
-    `⏱️ Se enviaría por Correo Argentino 📦 y llega en 2 - 5 días hábiles.\n\nLink para realizar el pedido 👇✨\nhttps://golosinasaries.github.io/catalogo`
-  );
-}
-
-async function asesor(to) {
-  usuariosAsesor.add(to);
-
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "Perfecto 😊\n\nTe llevamos directo al chat del asesor."
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Hablar con asesor",
-          url: "https://wa.me/542236010443"
-        }
-      }
-    }
-  });
-}
-
-async function compraMinima(to) {
-  await sendText(
-    to,
-    `💰 La compra mínima es de $50.000.`
-  );
-}
-
-async function costoEnvio(to) {
-  await sendText(
-    to,
-    `📍 Para saber el valor del envío hasta tu localidad 🚚
-
-🛒 Ingresá a nuestra tienda online 👇
-golosinasaries.github.io/catalogo
-
-☰ En el menú de las tres rayitas vas a encontrar la opción *"Costo de envío"*, donde podés consultar el valor según tu localidad 📦`
+    `Te invito a sumarte a nuestro grupo de WhatsApp ☺️\n${GRUPO_WHATSAPP}`
   );
 }
 
 function manejarTextoCliente(from, textoCliente) {
   if (!textoCliente) return;
 
-  if (usuariosAsesor.has(from)) return;
+  if (usuariosAsesor.has(from)) {
+    console.log("Usuario está con asesor, no respondo");
+    return;
+  }
 
-  // Incrementar contador de preguntas
   const contador = (usuariosContadores.get(from) || 0) + 1;
   usuariosContadores.set(from, contador);
 
@@ -453,9 +345,8 @@ function manejarTextoCliente(from, textoCliente) {
 
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
-    // Mostrar menú dinámico
     if (contador >= 3) {
-      return menuConAsesor(from);
+      return menuDinamico(from);
     }
     return menuDinamico(from);
   }
@@ -584,6 +475,7 @@ function manejarTextoCliente(from, textoCliente) {
   );
 }
 
+// ===== RUTAS =====
 app.get("/health", (req, res) => {
   res.json({ ok: true, bot: BOT_NAME });
 });
@@ -657,21 +549,55 @@ app.post("/webhook", async (req, res) => {
     const id = message.interactive?.button_reply?.id;
 
     if (id === "catalogo") {
-      await catalogo(from);
-      return;
-    }
+      const opciones = usuariosOpciones.get(from) || new Set();
+      opciones.add("catalogo");
+      opciones.add("pago");
+      usuariosOpciones.set(from, opciones);
 
-    if (id === "comprar") {
-      await comoComprar(from);
+      await sendWhatsApp({
+        messaging_product: "whatsapp",
+        to: from,
+        type: "interactive",
+        interactive: {
+          type: "cta_url",
+          body: {
+            text: "🛒 Acá está nuestro catálogo completo ✨"
+          },
+          action: {
+            name: "cta_url",
+            parameters: {
+              display_text: "Ver catálogo",
+              url: "https://golosinasaries.github.io/catalogo"
+            }
+          }
+        }
+      });
+
+      registrarMensaje({
+        from,
+        tipo: "interactive",
+        texto: "Catálogo",
+        estado: "bot",
+        direccion: "salida"
+      });
+
+      // Incrementar contador
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
+
       return;
     }
 
     if (id === "compra_minima") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await compraMinima(from);
       return;
     }
 
     if (id === "costo_envio") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await costoEnvio(from);
       return;
     }
@@ -682,27 +608,35 @@ app.post("/webhook", async (req, res) => {
     }
 
     if (id === "pago") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await pago(from);
       return;
     }
 
     if (id === "envio") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await envios(from);
       return;
     }
 
     if (id === "ubicacion") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await ubicacion(from);
       return;
     }
 
     if (id === "demora") {
+      const contador = (usuariosContadores.get(from) || 0) + 1;
+      usuariosContadores.set(from, contador);
       await demora(from);
       return;
     }
 
     if (id === "menu") {
-      await menu(from);
+      await menuDinamico(from);
       return;
     }
   }
