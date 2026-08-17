@@ -10,7 +10,10 @@ const ARCHIVO = "./conversaciones.json";
 const NUMERO_VENTAS = "2236010443";
 const BOT_NAME = "Golosinas Aries";
 const GRUPO_WHATSAPP = "https://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad";
+
 const usuariosConsultandoGrupo = new Set();
+const usuariosIniciados = new Set();
+const usuariosAsesor = new Set();
 
 function normalizeText(text = "") {
   return String(text)
@@ -48,8 +51,6 @@ function guardarConversaciones(datos) {
 }
 
 let mensajes = cargarConversaciones();
-const usuariosIniciados = new Set();
-const usuariosAsesor = new Set();
 
 function fechaISO() {
   return new Date().toISOString();
@@ -89,9 +90,7 @@ async function sendText(to, mensaje) {
     messaging_product: "whatsapp",
     to,
     type: "text",
-    text: {
-      body: mensaje
-    }
+    text: { body: mensaje }
   });
 }
 
@@ -102,9 +101,7 @@ async function sendButtonMenu(to, body, buttons) {
     type: "interactive",
     interactive: {
       type: "button",
-      body: {
-        text: body
-      },
+      body: { text: body },
       action: {
         buttons: buttons.map((button) => ({
           type: "reply",
@@ -161,21 +158,49 @@ function containsAny(text, list) {
 }
 
 async function menu(to) {
-  await sendButtonMenu(
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
     to,
-    `👋 ¡Hola! Bienvenid@ a ${BOT_NAME} ✨\n\nPodés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.\n\n¿Qué querés ver ahora?`,
-    [
-      { id: "catalogo", title: "🛒 Ver catálogo" },
-      { id: "comprar", title: "📦 Cómo comprar" },
-      { id: "pedido", title: "💬 Hacer pedido" }
-    ]
-  );
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\nPodés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.\n\n¿Qué querés ver ahora?"
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Ver catálogo",
+          url: "https://golosinasaries.github.io/catalogo"
+        }
+      }
+    }
+  });
+
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "💬 Si necesitás ayuda humana."
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Hablar con asesor",
+          url: "https://wa.me/542236010443"
+        }
+      }
+    }
+  });
 }
 
 async function catalogo(to) {
   await sendText(
     to,
-    `🛒 Acá podés ver todos nuestros productos y precios:\n\nhttps://golosinasaries.github.io/catalogo\n\n📍 Si ya elegiste lo que querés, para cerrar tu pedido te derivamos al WhatsApp principal:\n📲 ${NUMERO_VENTAS}`
+    `🛒 Catálogo directo:\nhttps://golosinasaries.github.io/catalogo\n\nSi ya elegiste algo, usá el botón "Hacer pedido" dentro del catálogo.`
   );
 }
 
@@ -188,7 +213,7 @@ async function catalogoConGrupo(to) {
 
 golosinasaries.github.io/catalogo 💖
 
-📢 En caso de nuevos ingresos o reposición de productos, lo estaremos anunciando en el grupo.
+📢 En caso de nuevos ingresos, lo estaremos anunciando en el grupo.
 
 ¿Te gustaría unirte a nuestro grupo de WhatsApp?`
   );
@@ -207,60 +232,59 @@ ${GRUPO_WHATSAPP}`
 async function comoComprar(to) {
   await sendText(
     to,
-    `¡Genial! 😊 Así es el flujo recomendado:\n\n1️⃣ Revisá el catálogo 👇\nhttps://golosinasaries.github.io/catalogo\n\n2️⃣ Armá tu carrito con lo que quieras 🛒\n\n3️⃣ Cuando estés listo, para cerrar el pedido te derivamos a nuestro WhatsApp principal:\n📲 ${NUMERO_VENTAS}\n\n4️⃣ Ahí coordinamos pago, envío y detalles del pedido 💬\n\n👉 El bot no reemplaza el WhatsApp principal; funciona como filtro y recepción.`
-  );
-}
-
-async function pasarVentas(to) {
-  await sendText(
-    to,
-    `🛒 Para cerrar tu pedido y coordinar envío y pago, te pasamos a nuestro WhatsApp principal:\n\n📲 ${NUMERO_VENTAS}\n\nEscribinos ahí y seguimos con tu compra 😊`
+    `🛒 Catálogo directo:\nhttps://golosinasaries.github.io/catalogo\n\nSi ya elegiste algo, usá el botón "Hacer pedido" dentro del catálogo.`
   );
 }
 
 async function pago(to) {
   await sendText(
     to,
-    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries\n\nSi ya te decidiste, para cerrar tu pedido te pasamos al WhatsApp principal:\n📲 ${NUMERO_VENTAS}`
+    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
   );
 }
 
 async function envios(to) {
   await sendText(
     to,
-    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊\n\nSi ya te decidiste por un pedido: 📲 ${NUMERO_VENTAS}`
+    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
   );
 }
 
 async function ubicacion(to) {
   await sendText(
     to,
-    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷\n\nSi querés cerrar un pedido, escribinos por:\n📲 ${NUMERO_VENTAS}`
+    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
   );
 }
 
 async function demora(to) {
   await sendText(
     to,
-    `⏱️ Los tiempos dependen de la localidad y del medio de envío.\n\nSi me decís tu ciudad te puedo orientar mejor 😊\n\nY si ya te decidiste, para cerrar tu pedido: 📲 ${NUMERO_VENTAS}`
+    `⏱️ Se enviaría por Correo Argentino 📦 y llega en 2 - 5 días hábiles.\n\nLink para realizar el pedido 👇✨\nhttps://golosinasaries.github.io/catalogo`
   );
 }
 
 async function asesor(to) {
   usuariosAsesor.add(to);
 
-  registrarMensaje({
-    from: to,
-    tipo: "text",
-    texto: "Solicitó hablar con asesor",
-    estado: "humano",
-    direccion: "entrada"
-  });
-
-  await sendText(
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
     to,
-    `Perfecto 😊 En breve un asesor se pondrá en contacto con vos.\n\nMientras tanto, dejá tu consulta en pocas palabras para que podamos ayudarte mejor 🙌\n\nSi querés cerrar un pedido directamente, también podés hacerlo por:\n📲 ${NUMERO_VENTAS}`
-  );
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: {
+        text: "Perfecto 😊\n\nTe llevamos directo al chat del asesor."
+      },
+      action: {
+        name: "cta_url",
+        parameters: {
+          display_text: "Hablar con asesor",
+          url: "https://wa.me/542236010443"
+        }
+      }
+    }
+  });
 }
 
 function manejarTextoCliente(from, textoCliente) {
@@ -321,7 +345,7 @@ function manejarTextoCliente(from, textoCliente) {
       "hacer compra"
     ])
   ) {
-    return comoComprar(from);
+    return catalogo(from);
   }
 
   if (
@@ -487,8 +511,8 @@ app.post("/webhook", async (req, res) => {
       return;
     }
 
-    if (id === "pedido") {
-      await pasarVentas(from);
+    if (id === "asesor") {
+      await asesor(from);
       return;
     }
 
