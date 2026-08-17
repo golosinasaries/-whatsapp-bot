@@ -22,5 +22,37 @@
     "fecha": "2026-08-17T16:54:57.983Z",
     "estado": "humano",
     "direccion": "salida"
+  },
+  {
+    "from": "54922366907006",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T17:39:54.166Z",
+    "estado": "humano",
+    "direccion": "salida"
+  },
+  {
+    "from": "54922366907006",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T17:43:15.686Z",
+    "estado": "humano",
+    "direccion": "salida"
+  },
+  {
+    "from": "54922366907006",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T17:43:16.559Z",
+    "estado": "humano",
+    "direccion": "salida"
+  },
+  {
+    "from": "54922366907006",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-17T18:08:04.571Z",
+    "estado": "humano",
+    "direccion": "salida"
   }
 ]

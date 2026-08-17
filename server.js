@@ -247,7 +247,6 @@ function containsAny(text, list) {
 }
 
 
-
 // ===== MENÚS =====
 async function menu(to) {
   await sendWhatsApp({
@@ -255,32 +254,16 @@ async function menu(to) {
     to,
     type: "interactive",
     interactive: {
-      type: "button",
+      type: "cta_url",
       body: {
         text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?"
       },
       action: {
-        buttons: [
-          {
-            type: "url",
-            text: "🛒 Ver productos",
-            url: "https://golosinasaries.github.io/catalogo"
-          },
-          {
-            type: "reply",
-            reply: {
-              id: "envio",
-              title: "🚚 Cómo es el envío"
-            }
-          },
-          {
-            type: "reply",
-            reply: {
-              id: "ubicacion",
-              title: "📍 De dónde somos"
-            }
-          }
-        ]
+        name: "cta_url",
+        parameters: {
+          display_text: "🛒 Ver productos",
+          url: "https://golosinasaries.github.io/catalogo"
+        }
       }
     }
   });
@@ -933,13 +916,13 @@ app.get("/webhook", (req, res) => {
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 
+  console.log("LLEGO WEBHOOK");
+  console.log(JSON.stringify(req.body, null, 2));
+
   const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   if (!message) return;
 
   const from = message.from;
-
-  // ← AGREGAR ESTA LÍNEA AL INICIO
-  await verificarInactividad(from);
 
   if (
     message.type === "text" ||
