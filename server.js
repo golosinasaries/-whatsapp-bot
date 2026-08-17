@@ -158,43 +158,21 @@ function containsAny(text, list) {
 }
 
 async function menu(to) {
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
+  await sendButtonMenu(
     to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\nPodés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.\n\n¿Qué querés ver ahora?"
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Ver catálogo",
-          url: "https://golosinasaries.github.io/catalogo"
-        }
-      }
-    }
-  });
+    `👋 ¡Hola! Bienvenid@ a ${BOT_NAME} ✨
 
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "cta_url",
-      body: {
-        text: "💬 Si necesitás ayuda humana."
-      },
-      action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "Hablar con asesor",
-          url: "https://wa.me/542236010443"
-        }
-      }
-    }
-  });
+Podés consultar productos, precios, pagos, envíos, ubicación o cómo comprar.
+
+¿Qué querés ver ahora?`,
+    [
+      { id: "catalogo", title: "🛒 Ver catálogo" },
+      { id: "comprar", title: "📦 Cómo comprar" },
+      { id: "compra_minima", title: "💰 ¿Cuál es la compra mínima?" },
+      { id: "costo_envio", title: "🚚 ¿Cuánto sale el envío?" },
+      { id: "asesor", title: "💬 Hablar con asesor" }
+    ]
+  );
 }
 
 async function catalogo(to) {
@@ -287,6 +265,25 @@ async function asesor(to) {
   });
 }
 
+async function compraMinima(to) {
+  await sendText(
+    to,
+    `💰 La compra mínima es de $50.000.`
+  );
+}
+
+async function costoEnvio(to) {
+  await sendText(
+    to,
+    `📍 Para saber el valor del envío hasta tu localidad 🚚
+
+🛒 Ingresá a nuestra tienda online 👇
+golosinasaries.github.io/catalogo
+
+☰ En el menú de las tres rayitas vas a encontrar la opción *“Costo de envío”*, donde podés consultar el valor según tu localidad 📦`
+  );
+}
+
 function manejarTextoCliente(from, textoCliente) {
   if (!textoCliente) return;
 
@@ -306,6 +303,33 @@ function manejarTextoCliente(from, textoCliente) {
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
     return menu(from);
+  }
+
+  if (
+    containsAny(textoCliente, [
+      "compra minima",
+      "compra mínima",
+      "cuanto es la compra minima",
+      "cuál es la compra mínima",
+      "cual es la compra minima",
+      "cuánto es la compra mínima"
+    ])
+  ) {
+    return compraMinima(from);
+  }
+
+  if (
+    containsAny(textoCliente, [
+      "costo envio",
+      "costo de envio",
+      "precio del envio",
+      "cuanto sale el envio",
+      "cuánto sale el envío",
+      "envio hasta mi localidad",
+      "valor del envio"
+    ])
+  ) {
+    return costoEnvio(from);
   }
 
   if (
@@ -508,6 +532,16 @@ app.post("/webhook", async (req, res) => {
 
     if (id === "comprar") {
       await comoComprar(from);
+      return;
+    }
+
+    if (id === "compra_minima") {
+      await compraMinima(from);
+      return;
+    }
+
+    if (id === "costo_envio") {
+      await costoEnvio(from);
       return;
     }
 
