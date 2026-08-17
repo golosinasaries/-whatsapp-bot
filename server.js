@@ -43,11 +43,12 @@ app.post("/webhook",async(req,res)=>{
 
 
   if(
-    message.type==="text"||
-    message.type==="image"||
-    message.type==="audio"||
-    message.type==="document"
-  ){
+  message.type==="text"||
+  message.type==="image"||
+  message.type==="audio"||
+  message.type==="document"||
+  message.type==="video"
+){
 
     let contenido="";
     let tipo=message.type;
@@ -68,13 +69,18 @@ app.post("/webhook",async(req,res)=>{
       contenido="📄 Documento recibido";
     }
 
+    if(message.type==="video"){
+      contenido="🎥 Video recibido";
+    }
+
 
     mensajes.push({
       from,
       tipo,
       texto:contenido,
       fecha:new Date().toISOString(),
-      estado:usuariosAsesor.has(from)?"humano":"bot"
+      estado:usuariosAsesor.has(from)?"humano":"bot",
+      direccion:"entrada"
     });
 
     guardarConversaciones(mensajes);
@@ -181,6 +187,143 @@ app.post("/webhook",async(req,res)=>{
 app.get("/mensajes",(req,res)=>{
   res.json(mensajes);
 });
+function protegerAdmin(req,res,next){
+
+  const auth=req.headers.authorization;
+
+  if(!auth){
+    res.setHeader("WWW-Authenticate","Basic");
+    return res.status(401).send("Necesita autorización");
+  }
+
+  const datos=Buffer.from(
+    auth.split(" ")[1],
+    "base64"
+  ).toString().split(":");
+
+
+  const usuario=datos[0];
+  const clave=datos[1];
+
+
+  if(
+    usuario===process.env.ADMIN_USER &&
+    clave===process.env.ADMIN_PASSWORD
+  ){
+    return next();
+  }
+
+
+  res.status(403).send("Acceso denegado");
+
+}
+
+app.get("/admin",protegerAdmin,(req,res)=>{
+
+  let html = `
+  <html>
+  <head>
+    <title>Golosinas Aries - Atención</title>
+    <style>
+      body{
+        font-family:Arial;
+        padding:20px;
+        background:#f5f5f5;
+      }
+      .mensaje{
+        background:white;
+        padding:15px;
+        margin-bottom:10px;
+        border-radius:10px;
+      }
+      .humano{
+        border-left:5px solid green;
+      }
+      .bot{
+        border-left:5px solid blue;
+      }
+    </style>
+  </head>
+
+  <body>
+
+  <h1>💬 Golosinas Aries - Atención</h1>
+
+  `;
+
+
+  mensajes.slice().reverse().forEach(m=>{
+
+    html += `
+    <div class="mensaje ${m.estado}">
+      <b>Cliente:</b> ${m.from}<br>
+      <b>Tipo:</b> ${m.tipo || "texto"}<br>
+      <b>Mensaje:</b> ${m.texto}<br>
+      <b>Fecha:</b> ${m.fecha}<br>
+      <b>Estado:</b> ${m.estado}
+    </div>
+    `;
+
+  });
+
+  html += `
+
+<h2>Responder cliente</h2>
+
+<input id="cliente" placeholder="Número WhatsApp">
+
+<br><br>
+
+<textarea id="mensaje" placeholder="Escribí el mensaje"></textarea>
+
+<br><br>
+
+<button onclick="enviar()">Enviar</button>
+
+
+<script>
+
+async function enviar(){
+
+const to=document.getElementById("cliente").value;
+
+const mensaje=document.getElementById("mensaje").value;
+
+
+await fetch("/responder",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+to,
+mensaje,
+tipo:"text"
+})
+
+});
+
+
+alert("Mensaje enviado");
+
+}
+
+</script>
+
+`;
+
+  html += `
+  </body>
+  </html>
+  `;
+
+
+  res.send(html);
+
+});
 
 async function menu(to){
   await enviarBoton(
@@ -243,7 +386,8 @@ async function asesor(to){
     from:to,
     texto:"Solicitó hablar con asesor",
     fecha:new Date().toISOString(),
-    estado:"humano"
+    estado:"humano",
+    direccion:"entrada"
   });
 
   guardarConversaciones(mensajes);
@@ -312,6 +456,113 @@ async function texto(to,mensaje){
   );
 }
 
+async function enviarMensajeCliente(to, tipo, contenido){
+
+  let payload = {
+    messaging_product:"whatsapp",
+    to,
+    type:tipo
+  };
+
+
+  if(tipo==="text"){
+    payload.text={
+      body:contenido
+    };
+  }
+
+
+  if(tipo==="image"){
+    payload.image={
+      link:contenido
+    };
+  }
+
+
+  if(tipo==="video"){
+    payload.video={
+      link:contenido
+    };
+  }
+
+
+  if(tipo==="audio"){
+    payload.audio={
+      link:contenido
+    };
+  }
+
+
+  if(tipo==="document"){
+    payload.document={
+      link:contenido
+    };
+  }
+
+
+  await axios.post(
+    `https://graph.facebook.com/v23.0/${process.env.PHONE_NUMBER_ID}/messages`,
+    payload,
+    {
+      headers:{
+        Authorization:`Bearer ${process.env.WHATSAPP_TOKEN}`,
+        "Content-Type":"application/json"
+      }
+    }
+  );
+
+
+  mensajes.push({
+    from:to,
+    tipo,
+    texto:contenido,
+    fecha:new Date().toISOString(),
+    estado:"humano",
+    direccion:"salida"
+  });
+
+
+  guardarConversaciones(mensajes);
+
+}
+
+app.post("/responder",async(req,res)=>{
+
+  const {to,mensaje,tipo="text"}=req.body;
+
+
+  if(!to || !mensaje){
+    return res.status(400).json({
+      error:"Faltan datos"
+    });
+  }
+
+
+  try{
+
+    await enviarMensajeCliente(
+      to,
+      tipo,
+      mensaje
+    );
+
+
+    res.json({
+      ok:true
+    });
+
+
+  }catch(error){
+
+    console.log(error.response?.data || error);
+
+    res.status(500).json({
+      error:"No se pudo enviar"
+    });
+
+  }
+
+});
 
 const PORT=process.env.PORT||3000;
 
