@@ -8,6 +8,7 @@ app.use(express.json());
 
 const ARCHIVO = "./conversaciones.json";
 const NUMERO_VENTAS = "2236010443";
+
 const BOT_NAME = "Golosinas Aries";
 const GRUPO_WHATSAPP = "https://chat.whatsapp.com/Gvuz6sIsH1a4IssI5lAMad";
 
@@ -318,6 +319,7 @@ async function menuDinamico(to) {
 }
 
 // ===== RESPUESTAS =====
+
 async function compraMinima(to) {
   await sendText(to, `💰 La compra mínima es de $50.000.`);
   await botonesSiguientes(to);
@@ -332,9 +334,21 @@ async function costoEnvio(to) {
 }
 
 async function pago(to) {
+  const opciones = usuariosOpciones.get(to) || new Set();
+  opciones.add("pago");
+  usuariosOpciones.set(to, opciones);
+
   await sendText(
     to,
-    `💳 El pago se realiza por transferencia antes del envío.\n\nPodés ver referencias acá 👇\n\n👉 Facebook:\nhttps://www.facebook.com/profile.php?id=61578949001641\n\n👉 Instagram:\nhttps://www.instagram.com/golosinasaries`
+    `💳 El pago se realiza por transferencia antes del envío\n\nPodés ver algunas referencias acá 👇\n\n👉 *Facebook:* https://www.facebook.com/profile.php?id=61578949001641\n👉 *Instagram:* https://www.instagram.com/golosinasaries\n\n😄 *Seguinos* 💖\n👉 *Facebook:* https://www.facebook.com/profile.php?id=61577104861271\n👉 *Instagram:* https://www.instagram.com/golosinasaries`
+  );
+  await botonesSiguientes(to);
+}
+
+async function pagoCNC(to) {
+  await sendText(
+    to,
+    `💳 Podés pagar con tarjeta de crédito 💳, pero tené en cuenta que se aplica un recargo del 10% sobre el total de tu compra.`
   );
   await botonesSiguientes(to);
 }
@@ -427,50 +441,119 @@ async function invitacionGrupo(to) {
 
   await sendText(
     to,
-    `Te invito a sumarte a nuestro grupo de WhatsApp ☺️\n${GRUPO_WHATSAPP}`
+    `Buenísimo 🙌✨\n\nTe invito a sumarte a nuestro grupo de WhatsApp ☺️\n${GRUPO_WHATSAPP}`
   );
   
-  await sendButtonMenu(to, "¿En qué más te puedo ayudar?", [
-    { id: "envio", title: "🚚 Cómo es el envío" },
-    { id: "ubicacion", title: "📍 De dónde somos" },
-    { id: "pago", title: "💳 Formas de pago" }
-  ]);
+  await botonesSiguientes(to);
 }
 
 // Función para enviar botones después de cada respuesta
 async function botonesSiguientes(to) {
   const opciones = usuariosOpciones.get(to) || new Set();
   const botones = [
-    { id: "envio", title: "🚚 Cómo es el envío" },
-    { id: "ubicacion", title: "📍 De dónde somos" }
+    {
+      type: "url",
+      text: "🛒 Ver productos",
+      url: "https://golosinasaries.github.io/catalogo"
+    }
   ];
 
   // Agregar botones dinámicamente según consultas previas
   if (opciones.has("catalogo")) {
-    botones.push({ id: "compra_minima", title: "💰 Compra mínima" });
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "compra_minima",
+        title: "💰 Compra mínima"
+      }
+    });
   }
 
   if (opciones.has("envio")) {
-    botones.push({ id: "costo_envio", title: "📦 Costo del envío" });
-    botones.push({ id: "demora", title: "⏱️ Demora de envío" });
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "costo_envio",
+        title: "📦 Costo del envío"
+      }
+    });
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "demora",
+        title: "⏱️ Demora de envío"
+      }
+    });
   }
 
   if (opciones.has("pago")) {
-    botones.push({ id: "pago", title: "💳 Formas de pago" });
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "pago_cnc",
+        title: "💳 Pago con tarjeta"
+      }
+    });
+  }
+
+  if (!opciones.has("envio") && !opciones.has("catalogo")) {
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "envio",
+        title: "🚚 Cómo es el envío"
+      }
+    });
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "ubicacion",
+        title: "📍 De dónde somos"
+      }
+    });
   }
 
   const contador = usuariosContadores.get(to) || 0;
   if (contador >= 3) {
-    botones.push({ id: "asesor", title: "💬 Hablar con asesor" });
+    // Reemplazar último botón por asesor
+    botones.pop();
+    botones.push({
+      type: "reply",
+      reply: {
+        id: "asesor",
+        title: "💬 Hablar con asesor"
+      }
+    });
   }
 
   // Limitar a máximo 3 botones por mensaje
   const botonesFinal = botones.slice(0, 3);
 
-  await sendButtonMenu(to, "¿En qué más te puedo ayudar?", botonesFinal);
+  await sendWhatsApp({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: {
+        text: "¿En qué más te puedo ayudar?"
+      },
+      action: {
+        buttons: botonesFinal
+      }
+    }
+  });
+
+  registrarMensaje({
+    from: to,
+    tipo: "interactive",
+    texto: "Botones siguientes",
+    estado: "bot",
+    direccion: "salida"
+  });
 }
 
-function manejarTextoCliente(from, textoCliente) {
+async function manejarTextoCliente(from, textoCliente) {
   if (!textoCliente) return;
 
   if (usuariosAsesor.has(from)) {
@@ -483,7 +566,7 @@ function manejarTextoCliente(from, textoCliente) {
 
   if (usuariosConsultandoGrupo.has(from)) {
     if (containsAny(textoCliente, ["si", "sí", "quiero", "sumarme", "unirme", "dale"])) {
-      return invitacionGrupo(from);
+      return await invitacionGrupo(from);
     }
 
     if (containsAny(textoCliente, ["no", "gracias", "nah", "no quiero"])) {
@@ -496,7 +579,7 @@ function manejarTextoCliente(from, textoCliente) {
 
   const menuTriggers = ["menu", "inicio", "volver", "principio"];
   if (containsAny(textoCliente, menuTriggers)) {
-    return menuDinamico(from);
+    return await menuDinamico(from);
   }
 
   if (
@@ -509,7 +592,7 @@ function manejarTextoCliente(from, textoCliente) {
       "cuánto es la compra mínima"
     ])
   ) {
-    return compraMinima(from);
+    return await compraMinima(from);
   }
 
   if (
@@ -523,7 +606,7 @@ function manejarTextoCliente(from, textoCliente) {
       "valor del envio"
     ])
   ) {
-    return costoEnvio(from);
+    return await costoEnvio(from);
   }
 
   if (
@@ -547,20 +630,27 @@ function manejarTextoCliente(from, textoCliente) {
       "estan disponibles"
     ])
   ) {
-    return catalogoConGrupo(from);
+    return await catalogoConGrupo(from);
   }
 
   if (
     containsAny(textoCliente, [
       "pago",
       "transferencia",
-      "alias",
-      "deposito",
-      "deposito bancario",
-      "depósito"
+      "formas de pago"
     ])
   ) {
-    return pago(from);
+    return await pago(from);
+  }
+
+  if (
+    containsAny(textoCliente, [
+      "tarjeta",
+      "recargo",
+      "pago con tarjeta"
+    ])
+  ) {
+    return await pagoCNC(from);
   }
 
   if (
@@ -573,7 +663,7 @@ function manejarTextoCliente(from, textoCliente) {
       "envio a"
     ])
   ) {
-    return envios(from);
+    return await envios(from);
   }
 
   if (
@@ -587,7 +677,7 @@ function manejarTextoCliente(from, textoCliente) {
       "dirección"
     ])
   ) {
-    return ubicacion(from);
+    return await ubicacion(from);
   }
 
   if (
@@ -599,7 +689,7 @@ function manejarTextoCliente(from, textoCliente) {
       "tarda"
     ])
   ) {
-    return demora(from);
+    return await demora(from);
   }
 
   if (
@@ -614,10 +704,10 @@ function manejarTextoCliente(from, textoCliente) {
       "consultar"
     ])
   ) {
-    return asesor(from);
+    return await asesor(from);
   }
 
-  return sendText(
+  await sendText(
     from,
     `😅 No entendí bien tu consulta, pero podés escribir:\n\n🛒 Productos\n🚚 Envíos\n📍 Ubicación\n\nO escribí 'menú' para volver al inicio 😊`
   );
@@ -748,6 +838,11 @@ app.post("/webhook", async (req, res) => {
       return;
     }
 
+    if (id === "pago_cnc") {
+      await pagoCNC(from);
+      return;
+    }
+
     if (id === "menu") {
       await menuDinamico(from);
       return;
@@ -829,14 +924,44 @@ app.get("/admin", protegerAdmin, (req, res) => {
         border-right: 1px solid #ccc;
         padding: 15px;
         overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      #nuevo-cliente {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #ccc;
+      }
+      #nuevo-cliente input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+      }
+      #nuevo-cliente button {
+        width: 100%;
+        padding: 10px;
+        background: #25d366;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      #nuevo-cliente button:hover {
+        background: #1fa952;
       }
       .cliente {
         padding: 12px;
         border-bottom: 1px solid #ddd;
+        cursor: pointer;
       }
       .cliente a {
         text-decoration: none;
         color: #222;
+      }
+      .cliente:hover {
+        background: #f0f0f0;
       }
       #chat {
         flex: 1;
@@ -868,16 +993,30 @@ app.get("/admin", protegerAdmin, (req, res) => {
         min-height: 80px;
         margin-bottom: 10px;
         resize: vertical;
+        box-sizing: border-box;
       }
       button {
         padding: 12px 16px;
         cursor: pointer;
+        background: #25d366;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #1fa952;
       }
     </style>
   </head>
   <body>
     <div id="clientes">
-      <h2>Clientes</h2>
+      <div id="nuevo-cliente">
+        <h3>Nuevo cliente</h3>
+        <input type="text" id="numeroNuevo" placeholder="Ingresa el número (ej: 5491234567890)">
+        <button onclick="irAlCliente()">Ir al cliente</button>
+      </div>
+      <h3>Clientes previos</h3>
       ${clientesHTML}
     </div>
 
@@ -893,6 +1032,15 @@ app.get("/admin", protegerAdmin, (req, res) => {
     </div>
 
     <script>
+      function irAlCliente() {
+        const numero = document.getElementById("numeroNuevo").value.trim();
+        if (!numero) {
+          alert("Ingresa un número válido");
+          return;
+        }
+        window.location.href = "/admin?cliente=" + encodeURIComponent(numero);
+      }
+
       async function enviar() {
         const mensaje = document.getElementById("mensaje").value;
         if (!mensaje.trim()) return;
@@ -921,6 +1069,8 @@ app.get("/admin", protegerAdmin, (req, res) => {
 app.post("/responder", async (req, res) => {
   const { to, mensaje, tipo = "text" } = req.body;
 
+  console.log(`Admin intenta responder a ${to}: ${mensaje}`);
+
   if (!to || !mensaje) {
     return res.status(400).json({ error: "Faltan datos" });
   }
@@ -928,8 +1078,9 @@ app.post("/responder", async (req, res) => {
   try {
     await responderDesdeAdmin(to, tipo, mensaje);
     res.json({ ok: true });
+    console.log(`✅ Respuesta enviada a ${to}`);
   } catch (error) {
-    console.log("Error al responder:", error.response?.data || error.message || error);
+    console.log("❌ Error al responder:", error.response?.data || error.message || error);
     res.status(500).json({ error: "No se pudo enviar" });
   }
 });
