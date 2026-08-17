@@ -254,16 +254,20 @@ async function menu(to) {
     to,
     type: "interactive",
     interactive: {
-      type: "cta_url",
+      type: "button",
       body: {
         text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?"
       },
       action: {
-        name: "cta_url",
-        parameters: {
-          display_text: "🛒 Ver productos",
-          url: "https://golosinasaries.github.io/catalogo"
-        }
+        buttons: [
+          {
+            type: "reply",
+            reply: {
+              id: "catalogo",
+              title: "🛒 Ver productos"
+            }
+          }
+        ]
       }
     }
   });
@@ -567,7 +571,7 @@ async function botonesSiguientes(to) {
 
   disponibles = disponibles.sort(() => Math.random() - 0.5);
 
-  const elegir = disponibles.slice(0, 1);
+  const elegir = disponibles.slice(0, 3);
 
   elegir.forEach((opcion) => {
     botones.push({
@@ -967,7 +971,7 @@ app.post("/webhook", async (req, res) => {
 
     if (!usuariosIniciados.has(from)) {
       usuariosIniciados.add(from);
-      usuariosEstado.set(from, "provincia");
+      usuariosEstado.delete(from);
       await menu(from);
       return;
     }
