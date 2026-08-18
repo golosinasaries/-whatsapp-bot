@@ -449,7 +449,7 @@ async function envios(to) {
 
   await sendText(
     to,
-    `🚚 Realizamos envíos a todo el país.\n\nTrabajamos con Correo Argentino y otros medios según la zona.\n\nDecime de dónde sos y te ayudo 😊`
+    `🚚 ¡Hacemos envíos a todo el país!\n\n📦 Los pedidos se despachan por Correo Argentino y llegan directamente a tu domicilio.\n\n⏱️ El tiempo estimado de entrega es de 2 a 5 días hábiles, dependiendo de la localidad.\n\n🔎 Una vez despachado tu pedido, te enviamos el número de seguimiento para que puedas consultar el estado del envío. 😊`
   );
   await botonesSiguientes(to);
 }
@@ -995,15 +995,22 @@ app.get("/webhook", (req, res) => {
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 
-  console.log("LLEGO WEBHOOK");
+  console.log("========== WEBHOOK ==========");
   console.log(JSON.stringify(req.body, null, 2));
 
   const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
-  if (!value?.messages) {
-    console.log("Webhook recibido pero no es mensaje entrante");
+  if (value?.statuses) {
+    console.log("📌 Es estado de mensaje, ignoro");
     return;
   }
+
+  if (!value?.messages) {
+    console.log("⚠️ No tiene messages");
+    return;
+  }
+
+  console.log("✅ MENSAJE ENTRANTE REAL");
 
   const message = value.messages[0];
 
