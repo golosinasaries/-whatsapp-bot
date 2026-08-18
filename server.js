@@ -441,7 +441,7 @@ async function pago(to) {
 
   await sendText(
     to,
-    `💳 El pago se realiza por transferencia antes del envío\n\nPodés ver algunas referencias acá 👇\n\n👉 *Facebook:* https://www.facebook.com/profile.php?id=61578949001641\n👉 *Instagram:* https://www.instagram.com/golosinasaries\n\n😄 *Seguinos* 💖\n👉 *Facebook:* https://www.facebook.com/profile.php?id=61577104861271\n👉 *Instagram:* https://www.instagram.com/golosinasaries`
+    `💳 El pago se realiza por transferencia antes del envío\n\nPodés ver algunas referencias acá 👇\n\n👉 *Facebook:* https://www.facebook.com/profile.php?id=61578949001641\n👉 *Instagram:* https://www.instagram.com/golosinasaries\n\n😄 `
   );
   await botonesSiguientes(to);
 }
@@ -449,7 +449,7 @@ async function pago(to) {
 async function pagoCNC(to) {
   await sendText(
     to,
-    `💳 Podés pagar con tarjeta de crédito 💳, pero tené en cuenta que se aplica un recargo del 10% sobre el total de tu compra.`
+    `💳 Podés pagar con tarjeta de crédito, pero tené en cuenta que se aplica un recargo del 10% sobre el total de tu compra.`
   );
   await botonesSiguientes(to);
 }
@@ -630,16 +630,29 @@ async function botonesSiguientes(to) {
     });
   }
 
-  const contador = usuariosContadores.get(to) || 0;
+const contador = usuariosContadores.get(to) || 0;
+
   if (contador >= 3) {
-    botones.pop();
-    botones.push({
-      type: "reply",
-      reply: {
-        id: "asesor",
-        title: "💬 Hablar con asesor"
+
+    botones.length = 0;
+
+    botones.push(
+      {
+        type: "reply",
+        reply: {
+          id: "catalogo",
+          title: "🛒 Ver catálogo"
+        }
+      },
+      {
+        type: "reply",
+        reply: {
+          id: "asesor",
+          title: "💬 Hablar con asesor"
+        }
       }
-    });
+    );
+
   }
 
   const botonesFinal = botones.slice(0, 3);
@@ -1106,6 +1119,16 @@ app.post("/webhook", async (req, res) => {
 
     if (id === "menu") {
       await menuDinamico(from);
+      return;
+    }
+
+    if (id === "catalogo") {
+      await catalogoConGrupo(from);
+      return;
+    }
+
+    if (id === "grupo") {
+      await invitacionGrupo(from);
       return;
     }
   }
