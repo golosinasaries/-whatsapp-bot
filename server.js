@@ -109,6 +109,24 @@ function guardarConversaciones(datos) {
 
 let mensajes = cargarConversaciones();
 
+function limpiarConversacionesViejas() {
+
+  const limite = Date.now() - (10 * 24 * 60 * 60 * 1000);
+
+  mensajes = mensajes.filter((m) => {
+    return new Date(m.fecha).getTime() > limite;
+  });
+
+  guardarConversaciones(mensajes);
+
+  console.log("🧹 Limpieza automática: mensajes de más de 10 días eliminados");
+}
+
+setInterval(() => {
+  limpiarConversacionesViejas();
+}, 24 * 60 * 60 * 1000);
+
+
 function fechaISO() {
   return new Date().toISOString();
 }
@@ -998,9 +1016,12 @@ app.post("/webhook", async (req, res) => {
   console.log("========== WEBHOOK ==========");
   console.log(JSON.stringify(req.body, null, 2));
 
+  console.log("TIENE MESSAGES:", !!req.body.entry?.[0]?.changes?.[0]?.value?.messages);
+  console.log("TIENE STATUSES:", !!req.body.entry?.[0]?.changes?.[0]?.value?.statuses);
+
   const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
-  if (value?.statuses) {
+  if (value?.statuses && !value?.messages) {
     console.log("📌 Es estado de mensaje, ignoro");
     return;
   }
@@ -1011,6 +1032,7 @@ app.post("/webhook", async (req, res) => {
   }
 
   console.log("✅ MENSAJE ENTRANTE REAL");
+  console.log("MESSAGES:", JSON.stringify(value.messages, null, 2));
 
   const message = value.messages[0];
 
@@ -1175,7 +1197,13 @@ app.get("/admin", protegerAdmin, (req, res) => {
     .map(
       (c) => `
         <div class="cliente">
-          <a href="/admin?cliente=${encodeURIComponent(c)}">${escapeHTML(c)}</a>
+          <a href="/admin?cliente=${encodeURIComponent(c)}">
+            ${escapeHTML(c)}
+          </a>
+
+          <button onclick="eliminarCliente('${escapeHTML(c)}')">
+            🗑️
+          </button>
         </div>
       `
     )
@@ -1385,6 +1413,38 @@ app.get("/admin", protegerAdmin, (req, res) => {
           console.error("Network error:", err);
         }
       }
+      
+      async function eliminarCliente(cliente) {
+
+          if (!confirm("¿Eliminar conversación de " + cliente + "?")) {
+            return;
+          }
+
+          try {
+
+            const response = await fetch("/eliminar-cliente", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                cliente: cliente
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.ok) {
+              alert("Cliente eliminado");
+              location.href = "/admin";
+            }
+
+          } catch (error) {
+            alert("Error eliminando cliente");
+            console.log(error);
+          }
+
+        }
 
       document.addEventListener("DOMContentLoaded", function() {
         const textarea = document.getElementById("mensaje");
@@ -1403,6 +1463,30 @@ app.get("/admin", protegerAdmin, (req, res) => {
   `;
 
   res.send(html);
+});
+
+app.post("/eliminar-cliente", (req, res) => {
+
+  const { cliente } = req.body;
+
+  if (!cliente) {
+    return res.status(400).json({
+      error: "Falta cliente"
+    });
+  }
+
+  mensajes = mensajes.filter(
+    (m) => m.from !== cliente
+  );
+
+  guardarConversaciones(mensajes);
+
+  console.log(`🗑️ Cliente eliminado: ${cliente}`);
+
+  res.json({
+    ok: true
+  });
+
 });
 
 app.post("/responder", async (req, res) => {
