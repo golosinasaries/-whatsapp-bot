@@ -250,36 +250,24 @@ function containsAny(text, list) {
 
 // ===== MENÚS =====
 async function menu(to) {
-  await sendWhatsApp({
-    messaging_product: "whatsapp",
+  await sendButtonMenu(
     to,
-    type: "interactive",
-    interactive: {
-      type: "button",
-      body: {
-        text: "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?"
+    "👋 ¡Hola! Bienvenid@ a Golosinas Aries ✨\n\n¿En qué te puedo ayudar?",
+    [
+      {
+        id: "catalogo",
+        title: "🛒 Ver productos"
       },
-      action: {
-        buttons: [
-          {
-            type: "reply",
-            reply: {
-              id: "catalogo",
-              title: "🛒 Ver productos"
-            }
-          }
-        ]
+      {
+        id: "envio",
+        title: "🚚 Cómo es el envío"
+      },
+      {
+        id: "ubicacion",
+        title: "📍 De dónde somos"
       }
-    }
-  });
-
-  registrarMensaje({
-    from: to,
-    tipo: "interactive",
-    texto: "Menú bienvenida",
-    estado: "bot",
-    direccion: "salida"
-  });
+    ]
+  );
 }
 
 async function menuDinamico(to) {
@@ -526,17 +514,21 @@ async function catalogoConGrupo(to) {
   usuariosConsultandoGrupo.add(to);
 
   await sendText(
-    to,
-    `***** Todo lo disponible lo encontrás en nuestro catálogo ***** 👇🏻✨\n\ngolosinasaries.github.io/catalogo 💖\n\n📢 En caso de nuevos ingresos, lo estaremos anunciando en el grupo.\n\n¿Te gustaría unirte a nuestro grupo de WhatsApp?`
-  );
-  
-  await sendButtonMenu(to, "¿En qué más te puedo ayudar?", [
-    { id: "envio", title: "🚚 Cómo es el envío" },
-    { id: "ubicacion", title: "📍 De dónde somos" },
-    { id: "pago", title: "💳 Formas de pago" }
+  to,
+  `🛒 *Todo lo disponible lo encontrás en nuestro catálogo* 👇✨\n\ngolosinasaries.github.io/catalogo 💖\n\n📢 Si querés enterarte de nuevos ingresos, también tenemos un grupo de WhatsApp.\n\n¿Te gustaría unirte?`
+);
+
+  await sendButtonMenu(to, "Elegí una opción:", [
+    {
+      id: "grupo_si",
+      title: "✅ Sí, unirme"
+    },
+    {
+      id: "catalogo",
+      title: "🛒 Ver productos"
+    }
   ]);
 }
-
 async function invitacionGrupo(to) {
   usuariosConsultandoGrupo.delete(to);
 
@@ -1006,8 +998,14 @@ app.post("/webhook", async (req, res) => {
   console.log("LLEGO WEBHOOK");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-  if (!message) return;
+  const value = req.body.entry?.[0]?.changes?.[0]?.value;
+
+  if (!value?.messages) {
+    console.log("Webhook recibido pero no es mensaje entrante");
+    return;
+  }
+
+  const message = value.messages[0];
 
   const from = message.from;
 
