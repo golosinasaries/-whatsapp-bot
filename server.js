@@ -461,7 +461,7 @@ async function ubicacion(to) {
 
   await sendText(
     to,
-    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷`
+    `📍 Estamos en Miramar, Buenos Aires.\n\nHacemos envíos a todo el país 🇦🇷 `
   );
   await botonesSiguientes(to);
 }
@@ -605,7 +605,7 @@ async function botonesSiguientes(to) {
     });
   }
 
-  if (!opciones.has("envio") && !opciones.has("catalogo")) {
+  if (!opciones.has("envio") || opciones.has("ubicacion")) {
     botones.push({
       type: "reply",
       reply: {
