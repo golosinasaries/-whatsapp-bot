@@ -520,7 +520,7 @@ async function catalogoConGrupo(to) {
 
   await sendButtonMenu(to, "Elegí una opción:", [
     {
-      id: "grupo_si",
+      id: "grupo",
       title: "✅ Sí, unirme"
     },
     {
