@@ -7,6 +7,7 @@ const app = express();
 app.use(express.json());
 
 const ARCHIVO = "./conversaciones.json";
+console.log("ARCHIVO:", require("path").resolve(ARCHIVO));
 const NUMERO_VENTAS = "2236010443";
 
 const BOT_NAME = "Golosinas Aries";
@@ -550,19 +551,21 @@ async function invitacionGrupo(to) {
 async function botonesSiguientes(to) {
   const opciones = usuariosOpciones.get(to) || new Set();
   const botones = [
-  {
-    type: "url",
-    text: "🛒 Ver productos",
-    url: "https://golosinasaries.github.io/catalogo"
-  },
-  {
-    type: "url",
-    text: "📢 Unirme al grupo",
-    url: GRUPO_WHATSAPP
-
+{
+  type: "reply",
+  reply: {
+    id: "catalogo",
+    title: "🛒 Ver productos"
   }
+},
+{
+  type: "reply",
+  reply: {
+    id: "grupo",
+    title: "📢 Unirme al grupo"
+  }
+}
 ];
-
   const usadas = usuariosOpciones.get(to) || new Set();
 
   let disponibles = opcionesAleatorias.filter(
@@ -571,7 +574,7 @@ async function botonesSiguientes(to) {
 
   disponibles = disponibles.sort(() => Math.random() - 0.5);
 
-  const elegir = disponibles.slice(0, 3);
+  const elegir = disponibles.slice(0, 1);
 
   elegir.forEach((opcion) => {
     botones.push({
@@ -665,6 +668,73 @@ async function botonesSiguientes(to) {
   });
 }
 
+
+async function botonesFallback(to) {
+  const contador = usuariosContadores.get(to) || 0;
+
+  if (contador >= 3) {
+    await sendText(
+      to,
+      `¿En qué más te puedo ayudar? 😊`
+    );
+
+    await sendButtonMenu(to, "Elegí una opción:", [
+      {
+        id: "catalogo",
+        title: "🛒 Ver productos"
+      },
+      {
+        id: "envio",
+        title: "🚚 Cómo es el envío"
+      }
+    ]);
+
+    await sendWhatsApp({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: {
+          text: "También podés hablar directamente con un asesor 👇"
+        },
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: "💬 Hablar con asesor",
+            url: `https://wa.me/54${NUMERO_VENTAS}?text=Quiero%20hablar%20con%20un%20asesor%20de%20Golosinas%20Aries`
+          }
+        }
+      }
+    });
+
+    registrarMensaje({
+      from: to,
+      tipo: "interactive",
+      texto: "Botones fallback + asesor",
+      estado: "bot",
+      direccion: "salida"
+    });
+
+    return;
+  }
+
+  await sendButtonMenu(to, "¿En qué más te puedo ayudar?", [
+    {
+      id: "catalogo",
+      title: "🛒 Ver productos"
+    },
+    {
+      id: "envio",
+      title: "🚚 Cómo es el envío"
+    },
+    {
+      id: "ubicacion",
+      title: "📍 De dónde somos"
+    }
+  ]);
+}
+
 async function manejarTextoCliente(from, textoCliente) {
   if (!textoCliente) return;
 
@@ -694,6 +764,7 @@ async function manejarTextoCliente(from, textoCliente) {
       containsAny(textoCliente, [
         "kiosco",
         "quiosco",
+        "feria",
         "kiosko",
         "comercio",
         "negocio",
@@ -718,6 +789,7 @@ async function manejarTextoCliente(from, textoCliente) {
         "tengo negocio",
         "soy comerciante",
         "si",
+        "feriante",
         "sí"
       ])
     ) {
@@ -750,9 +822,6 @@ async function manejarTextoCliente(from, textoCliente) {
   if (usuariosAsesor.has(from)) {
     usuariosAsesor.delete(from);
   }
-
-  const contador = (usuariosContadores.get(from) || 0) + 1;
-  usuariosContadores.set(from, contador);
 
   if (usuariosConsultandoGrupo.has(from)) {
     if (containsAny(textoCliente, ["si", "sí", "quiero", "sumarme", "unirme", "dale"])) {
@@ -899,9 +968,10 @@ async function manejarTextoCliente(from, textoCliente) {
 
   await sendText(
     from,
-    `😅 No entendí bien tu consulta, pero podés escribir:\n\n🛒 Productos\n🚚 Envíos\n📍 Ubicación\n\nO escribí 'menú' para volver al inicio 😊`
+    `😅 No entendí bien tu consulta.`
   );
-  await botonesSiguientes(from);
+
+  await botonesFallback(from);
 }
 
 // ===== RUTAS =====

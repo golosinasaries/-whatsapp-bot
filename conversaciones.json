@@ -54,5 +54,13 @@
     "fecha": "2026-08-17T18:08:04.571Z",
     "estado": "humano",
     "direccion": "salida"
+  },
+  {
+    "from": "5492236690706",
+    "tipo": "text",
+    "texto": "hola",
+    "fecha": "2026-08-18T00:34:33.965Z",
+    "estado": "humano",
+    "direccion": "salida"
   }
 ]
